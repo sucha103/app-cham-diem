@@ -1325,7 +1325,11 @@
             "- *Điểm tốt*: [Liệt kê các điểm sáng dựa trên các kỹ năng được kích hoạt]\n" +
             "- *Điểm cần cải thiện*: [Liệt kê các điểm cần đào sâu hoặc sửa đổi dựa trên các kỹ năng được kích hoạt]\n" +
             "**Lời khuyên**: [Đưa ra bài tập phản tư nhỏ hoặc lời khuyên cụ thể]\n\n" +
-            "LƯU Ý THÊM: Học viên có thể dán cả tiêu đề/đề bài lẫn lộn vào bài làm, bạn hãy tự bóc tách và chỉ tập trung nhận xét phần bài làm thực tế của học viên.";
+            "HƯỚNG DẪN ĐẦU RA (RẤT QUAN TRỌNG):\n" +
+            "- CHỈ hiển thị kết quả nhận xét cuối cùng bắt đầu bằng '**Tổng quan**'.\n" +
+            "- KHÔNG lặp lại đề bài, không lặp lại các tiêu chí chấm điểm hoặc các kỹ năng được áp dụng.\n" +
+            "- KHÔNG viết bất kỳ lời dẫn đề nào ở đầu câu trả lời (như 'Dưới đây là nhận xét...', 'Giảng viên chuyên nghiệp...').\n" +
+            "- Học viên có thể dán cả tiêu đề/đề bài lẫn lộn vào bài làm, bạn hãy tự bóc tách và chỉ tập trung nhận xét phần bài làm thực tế của học viên.";
 
         // Default AI Skills (Modular Gemma Skills)
         const DEFAULT_AI_SKILLS = [
@@ -1420,7 +1424,7 @@
                 }
             }
             
-            if (!appConfig.systemPrompt) {
+            if (!appConfig.systemPrompt || !appConfig.systemPrompt.includes("HƯỚNG DẪN ĐẦU RA")) {
                 appConfig.systemPrompt = DEFAULT_SYSTEM_PROMPT;
             }
             if (!appConfig.aiSkills || appConfig.aiSkills.length === 0) {
