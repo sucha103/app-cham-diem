@@ -1318,7 +1318,8 @@
             "YÊU CẦU QUAN TRỌNG VỀ ĐỊNH DẠNG VÀ PHONG CÁCH:\n" +
             "1. ĐỘ DÀI: Nhận xét ngắn gọn, cô đọng, tối đa 200 từ.\n" +
             "2. NGÔN NGỮ: Sử dụng tiếng Việt chuẩn xác.\n" +
-            "3. CẤU TRÚC PHẢN HỒI (BẮT BUỘC): Trả về nhận xét theo đúng cấu trúc sau:\n" +
+            "3. XƯNG HÔ (BẮT BUỘC): Luôn xưng hô 'chị' và gọi học viên là 'em'. Giữ giọng văn thấu hiểu, nhẹ nhàng, mang tính định hướng nâng đỡ và khích lệ tinh thần.\n" +
+            "4. CẤU TRÚC PHẢN HỒI (BẮT BUỘC): Trả về nhận xét theo đúng cấu trúc sau:\n" +
             "**Tổng quan**: [Đánh giá chung về bài viết và sự liên kết với câu hỏi định hướng của ngày học]\n" +
             "**Phân tích**:\n" +
             "- *Điểm tốt*: [Liệt kê các điểm sáng dựa trên các kỹ năng được kích hoạt]\n" +
@@ -1347,10 +1348,22 @@
                 instruction: "PHÂN TÍCH HÀNH VĂN & NGÔN TỪ:\n- Chỉ ra các lỗi chính tả, lặp từ hoặc câu văn quá dài dòng.\n- Đề xuất cách viết cô đọng, súc tích hơn hoặc gợi ý 1-2 từ ngữ sắc bén để làm nổi bật thông điệp bài viết."
             },
             {
-                id: "coaching",
-                name: "Đồng hành & Khích lệ",
-                description: "Đảm bảo AI dùng xưng xô 'chị - em' ấm áp, truyền lửa nâng đỡ.",
-                instruction: "PHONG CÁCH ĐỒNG HÀNH & KHÍCH LỆ:\n- Bắt buộc xưng hô 'chị' và gọi học viên là 'em'.\n- Giữ giọng văn nhẹ nhàng, thấu hiểu, mang tính định hướng nâng đỡ tinh thần và khích lệ em tiếp tục duy trì thói quen viết."
+                id: "imagery",
+                name: "Hình ảnh hóa (Show, Don't Tell)",
+                description: "Đánh giá việc sử dụng chi tiết thực tế, hình ảnh trực quan sinh động thay vì kể chung chung.",
+                instruction: "PHÂN TÍCH HÌNH ẢNH HÓA (SHOW, DON'T TELL):\n- Nhận xét xem bài viết đã sử dụng các chi tiết cụ thể, hình ảnh trực quan thực tế hay chưa.\n- Chỉ ra các câu văn mang tính kể tả khái quát và đề xuất cách viết lại sinh động bằng việc mô tả hành động, cảm xúc thực tế."
+            },
+            {
+                id: "voice",
+                name: "Cá tính & Giọng điệu (Voice)",
+                description: "Đánh giá dấu ấn cá nhân, độ chân thực và tính độc bản trong giọng văn học viên.",
+                instruction: "PHÂN TÍCH CÁ TÍNH & GIỌNG ĐIỆU:\n- Nhận xét xem giọng văn của em có tự nhiên, thể hiện cái tôi chân thực và độc bản không.\n- Giúp em phát huy phong cách viết cá nhân, tránh viết rập khuôn theo các khuôn mẫu định sẵn."
+            },
+            {
+                id: "resonance",
+                name: "Độ chạm & Thấu cảm",
+                description: "Đánh giá khả năng khơi gợi cảm xúc và kết nối đồng điệu thấu cảm với người đọc.",
+                instruction: "PHÂN TÍCH ĐỘ CHẠM & THẤU CẢM:\n- Nhận xét về cảm xúc được truyền tải trong bài viết và khả năng lay động tâm trí độc giả.\n- Chỉ ra cách để em viết lôi cuốn, chạm sâu và tạo sự thấu cảm lớn hơn từ người đọc."
             }
         ];
 
@@ -1388,6 +1401,19 @@
             if (savedConfig) {
                 try {
                     const parsed = JSON.parse(savedConfig);
+                    // Tự động gộp kỹ năng mới nếu có cập nhật danh sách kỹ năng mặc định
+                    if (parsed.aiSkills) {
+                        const mergedSkills = [];
+                        DEFAULT_AI_SKILLS.forEach(defSkill => {
+                            const userSkill = parsed.aiSkills.find(s => s.id === defSkill.id);
+                            if (userSkill) {
+                                mergedSkills.push(userSkill);
+                            } else {
+                                mergedSkills.push(defSkill);
+                            }
+                        });
+                        parsed.aiSkills = mergedSkills;
+                    }
                     appConfig = { ...appConfig, ...parsed };
                 } catch (e) {
                     console.error("Lỗi đọc cấu hình local:", e);
