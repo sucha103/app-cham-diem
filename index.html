@@ -546,6 +546,11 @@
             margin-bottom: 0.5rem;
         }
 
+        .markdown-body pre, .markdown-body code {
+            white-space: pre-wrap !important;
+            word-break: break-word;
+        }
+
         /* Editor Mode Style */
         .ai-editor-textarea {
             width: 100%;
@@ -1286,6 +1291,14 @@
     </div>
 
     <script>
+        // Set marked.js options
+        if (typeof marked !== 'undefined') {
+            marked.setOptions({
+                breaks: true,
+                gfm: true
+            });
+        }
+
         // Actual Reflection Questions & Topics loaded from the docx file
         const DEFAULT_DAYS_DATA = {
             1: { title: "Xả suy nghĩ thô", question: "Sau khi hoàn thành, hãy dành vài phút để suy nghĩ về những câu hỏi sau:\n1. Trong bài viết của mình, điều gì xuất hiện nhiều nhất? (lo lắng, áp lực, so sánh, mơ hồ...)\n2. Có điều gì mình viết ra mà trước đó mình chưa từng nhận ra không?\n3. Khi đọc lại, mình có hiểu rõ mình đang nghĩ gì không?\n4. Mình có cố viết cho hay không? (Lưu ý: Không phải viết hay, mà là viết thật)." },
@@ -1963,7 +1976,7 @@
                     day: day,
                     dayTitle: dayData.title,
                     essay: essay,
-                    aiReview: result.aiReview,
+                    aiReview: cleanMarkdownResponse(result.aiReview),
                     sheetSyncFailed: result.sheetSyncFailed,
                     sheetUrl: result.sheetUrl || "",
                     sheetName: result.sheetName || ""
@@ -1980,7 +1993,7 @@
                         day: day,
                         dayTitle: dayData.title,
                         essay: essay,
-                        aiReview: result.aiReview,
+                        aiReview: currentGradingResult.aiReview,
                         errorMsg: result.sheetError || "Lỗi lưu Sheet"
                     });
                 } else {
@@ -2126,7 +2139,7 @@
                 badgeContainer.innerHTML = `<span class="badge badge-success"><i data-lucide="cloud-check" style="width: 12px; height: 12px;"></i> Đã lưu Sheet</span>`;
             }
             
-            const reviewHtml = marked.parse(item.aiReview);
+            const reviewHtml = marked.parse(cleanMarkdownResponse(item.aiReview));
             document.getElementById("aiReviewOutput").innerHTML = reviewHtml;
             
             currentGradingResult = item;
@@ -2197,7 +2210,7 @@
                     throw new Error(result.error || "Gặp sự cố không xác định khi chấm.");
                 }
                 
-                currentGradingResult.aiReview = result.aiReview;
+                currentGradingResult.aiReview = cleanMarkdownResponse(result.aiReview);
                 currentGradingResult.sheetSyncFailed = result.sheetSyncFailed;
                 currentGradingResult.sheetUrl = result.sheetUrl || currentGradingResult.sheetUrl;
                 currentGradingResult.sheetName = result.sheetName || currentGradingResult.sheetName;
@@ -2205,7 +2218,7 @@
                 // Update history item
                 const histIdx = gradingHistory.findIndex(h => h.id === currentGradingResult.id);
                 if (histIdx !== -1) {
-                    gradingHistory[histIdx].aiReview = result.aiReview;
+                    gradingHistory[histIdx].aiReview = currentGradingResult.aiReview;
                     gradingHistory[histIdx].sheetSyncFailed = result.sheetSyncFailed;
                     if (result.sheetUrl) {
                         gradingHistory[histIdx].sheetUrl = result.sheetUrl;
@@ -2225,7 +2238,7 @@
                         day: currentGradingResult.day,
                         dayTitle: currentGradingResult.dayTitle,
                         essay: currentGradingResult.essay,
-                        aiReview: result.aiReview,
+                        aiReview: currentGradingResult.aiReview,
                         errorMsg: result.sheetError || "Lỗi lưu Sheet"
                     });
                 } else {
@@ -2629,6 +2642,16 @@
                  .replace(/>/g, "&gt;")
                  .replace(/"/g, "&quot;")
                  .replace(/'/g, "&#039;");
+        }
+
+        function cleanMarkdownResponse(text) {
+            if (!text) return "";
+            let cleaned = text.trim();
+            // Remove triple backticks wrapper (e.g. ```markdown ... ``` or ```txt ... ``` or ``` ... ```)
+            if (cleaned.startsWith("```")) {
+                cleaned = cleaned.replace(/^```[a-zA-Z]*\n?/, "").replace(/\n?```$/, "").trim();
+            }
+            return cleaned;
         }
     </script>
 </body>
