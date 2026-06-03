@@ -172,6 +172,13 @@
             .app-grid {
                 grid-template-columns: 1.2fr 1fr;
             }
+            .result-panel {
+                position: sticky;
+                top: 2rem;
+                align-self: start;
+                max-height: calc(100vh - 4rem);
+                overflow-y: auto;
+            }
         }
 
         /* Form Controls */
@@ -1036,7 +1043,7 @@
             </section>
 
             <!-- Right Panel: Results -->
-            <section class="glass-panel" style="display: flex; flex-direction: column;">
+            <section class="glass-panel result-panel" style="display: flex; flex-direction: column;">
                 <!-- Result States -->
                 <div class="result-empty" id="resultEmpty">
                     <i data-lucide="message-square-dashed" style="width: 64px; height: 64px;"></i>
@@ -1052,7 +1059,7 @@
                     <p style="font-size: 0.9rem; color: var(--text-muted); margin-top: 0.5rem;">Quá trình này mất khoảng 5-10 giây.</p>
                 </div>
 
-                <div class="result-content" id="resultContent" style="flex: 1; display: none; flex-direction: column; justify-content: space-between;">
+                <div class="result-content" id="resultContent" style="flex: 1; display: none; flex-direction: column; justify-content: flex-start;">
                     <div>
                         <div class="result-header">
                             <div>
