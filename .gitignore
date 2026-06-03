@@ -1,0 +1,13 @@
+# Ignore test Word files
+*.docx
+
+# Ignore Python server build/cache if any
+__pycache__/
+*.pyc
+
+# Ignore local build folder
+dist/
+
+# Ignore local system-generated brain and logs
+.system_generated/
+scratch/

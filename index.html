@@ -1,0 +1,2598 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini App Chấm Bài 28 Ngày — Rèn Tư Duy Qua Viết</title>
+    <meta name="description" content="Hệ thống chấm bài tự động bằng trí tuệ nhân tạo Gemma AI cho khóa học Rèn Tư Duy Qua Viết. Tích hợp Google Sheets và bộ nhớ cục bộ.">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Mammoth.js (DOCX text extraction) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+    <!-- Marked.js (Markdown parser) -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    
+    <style>
+        /* CSS Variables - Color Palette & Styling Tokens */
+        :root {
+            --font-main: 'Inter', sans-serif;
+            --font-heading: 'Outfit', sans-serif;
+            
+            /* Dark Theme Variables (Default) */
+            --bg-body: #0b0f19;
+            --bg-grid: rgba(99, 102, 241, 0.03);
+            --bg-glass: rgba(17, 24, 39, 0.7);
+            --border-glass: rgba(255, 255, 255, 0.08);
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --text-inverse: #111827;
+            
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --primary-glow: rgba(99, 102, 241, 0.4);
+            
+            --secondary: #10b981;
+            --secondary-hover: #059669;
+            
+            --danger: #ef4444;
+            --danger-hover: #dc2626;
+            
+            --warning: #f59e0b;
+            
+            --card-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            --transition-speed: 0.3s;
+        }
+
+        [data-theme="light"] {
+            /* Light Theme Variables */
+            --bg-body: #f3f4f6;
+            --bg-grid: rgba(99, 102, 241, 0.05);
+            --bg-glass: rgba(255, 255, 255, 0.8);
+            --border-glass: rgba(17, 24, 39, 0.08);
+            --text-main: #1f2937;
+            --text-muted: #6b7280;
+            --text-inverse: #ffffff;
+            
+            --primary: #4f46e5;
+            --primary-hover: #3730a3;
+            --primary-glow: rgba(79, 70, 229, 0.2);
+            
+            --card-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.08);
+        }
+
+        /* Base Reset */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-main);
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            min-height: 100vh;
+            line-height: 1.6;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(var(--bg-grid) 1px, transparent 0),
+                radial-gradient(var(--bg-grid) 1px, transparent 0);
+            background-size: 24px 24px;
+            background-position: 0 0, 12px 12px;
+            transition: background-color var(--transition-speed), color var(--transition-speed);
+        }
+
+        /* Background Glow Orbs */
+        .glow-orb {
+            position: absolute;
+            width: 400px;
+            height: 400px;
+            border-radius: 50%;
+            background: radial-gradient(circle, var(--primary-glow) 0%, transparent 70%);
+            z-index: -1;
+            pointer-events: none;
+            filter: blur(40px);
+        }
+        
+        .orb-1 {
+            top: -100px;
+            right: -100px;
+        }
+        
+        .orb-2 {
+            bottom: -100px;
+            left: -100px;
+            background: radial-gradient(circle, rgba(16, 185, 129, 0.1) 0%, transparent 70%);
+        }
+
+        /* Container & Grid Layout */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem;
+        }
+
+        /* Header Styles */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 2rem;
+            border-bottom: 1px solid var(--border-glass);
+            margin-bottom: 2rem;
+        }
+
+        .logo-section h1 {
+            font-family: var(--font-heading);
+            font-weight: 800;
+            font-size: 1.8rem;
+            background: linear-gradient(135deg, #a78bfa 0%, #818cf8 50%, #34d399 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.5px;
+        }
+
+        .logo-section p {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-top: 0.2rem;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        /* Glassmorphic Components */
+        .glass-panel {
+            background: var(--bg-glass);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--border-glass);
+            border-radius: 16px;
+            padding: 1.75rem;
+            box-shadow: var(--card-shadow);
+        }
+
+        /* Grid Layout */
+        .app-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2rem;
+        }
+
+        @media (min-width: 1024px) {
+            .app-grid {
+                grid-template-columns: 1.2fr 1fr;
+            }
+        }
+
+        /* Form Controls */
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1rem;
+        }
+
+        @media (min-width: 640px) {
+            .form-row {
+                grid-template-columns: 1fr 2fr;
+            }
+        }
+
+        label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--text-main);
+        }
+
+        input[type="text"], select, textarea {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-glass);
+            border-radius: 10px;
+            color: var(--text-main);
+            font-family: var(--font-main);
+            font-size: 0.95rem;
+            transition: all 0.2s ease;
+            outline: none;
+        }
+
+        [data-theme="light"] input[type="text"], [data-theme="light"] select, [data-theme="light"] textarea {
+            background: rgba(0, 0, 0, 0.02);
+        }
+
+        input[type="text"]:focus, select:focus, textarea:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-glow);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 250px;
+        }
+
+        /* Dropdown custom styling */
+        select option {
+            background-color: var(--bg-body);
+            color: var(--text-main);
+        }
+
+        /* DOCX Drag and Drop Zone styling */
+        .upload-dropzone {
+            border: 2px dashed var(--border-glass);
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: rgba(255, 255, 255, 0.01);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1.25rem;
+        }
+
+        [data-theme="light"] .upload-dropzone {
+            background: rgba(0, 0, 0, 0.005);
+        }
+
+        .upload-dropzone:hover, .upload-dropzone.dragover {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.04);
+            box-shadow: 0 0 10px 0 rgba(99, 102, 241, 0.1);
+        }
+
+        .upload-dropzone p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .upload-dropzone span {
+            color: var(--primary);
+            font-weight: 600;
+            text-decoration: underline;
+        }
+
+        /* Dynamic Day Prompt Indicator */
+        .day-indicator {
+            background: rgba(99, 102, 241, 0.08);
+            border-left: 4px solid var(--primary);
+            padding: 1rem;
+            border-radius: 0 12px 12px 0;
+            margin-bottom: 1.5rem;
+            display: none;
+        }
+
+        .day-indicator h4 {
+            font-family: var(--font-heading);
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 0.25rem;
+        }
+
+        .day-indicator p {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            white-space: pre-wrap; /* Preserve formatting of prompt questions */
+        }
+
+        /* AI Skills Checklist styling */
+        .skills-section {
+            margin-top: 1.5rem;
+            margin-bottom: 1.5rem;
+            border-top: 1px solid var(--border-glass);
+            padding-top: 1.25rem;
+        }
+
+        .skills-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 0.75rem;
+            margin-top: 0.75rem;
+        }
+
+        @media (min-width: 640px) {
+            .skills-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        .skill-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-glass);
+            border-radius: 10px;
+            padding: 0.75rem 1rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        [data-theme="light"] .skill-card {
+            background: rgba(0, 0, 0, 0.01);
+        }
+
+        .skill-card:hover {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.04);
+        }
+
+        .skill-card input[type="checkbox"] {
+            margin-top: 0.25rem;
+            width: 16px;
+            height: 16px;
+            accent-color: var(--primary);
+            cursor: pointer;
+        }
+
+        .skill-card-info h5 {
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+
+        .skill-card-info p {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.1rem;
+            line-height: 1.3;
+        }
+
+        /* Buttons & Actions */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            user-select: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, #4f46e5 100%);
+            color: var(--text-inverse);
+            box-shadow: 0 4px 14px 0 var(--primary-glow);
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px 0 var(--primary-glow);
+            filter: brightness(1.1);
+        }
+
+        .btn-primary:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--border-glass);
+            color: var(--text-main);
+        }
+
+        [data-theme="light"] .btn-secondary {
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        [data-theme="light"] .btn-secondary:hover:not(:disabled) {
+            background: rgba(0, 0, 0, 0.1);
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-danger:hover:not(:disabled) {
+            background: var(--danger-hover);
+        }
+
+        .btn-icon {
+            padding: 0.5rem;
+            border-radius: 50%;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .btn-submit-container {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 1rem;
+        }
+
+        /* Result Section States */
+        .result-empty {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            height: 100%;
+            min-height: 400px;
+            color: var(--text-muted);
+            border: 2px dashed var(--border-glass);
+            border-radius: 12px;
+            padding: 2rem;
+        }
+
+        .result-empty i {
+            margin-bottom: 1rem;
+            color: var(--primary);
+            opacity: 0.5;
+        }
+
+        .result-loading {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            min-height: 400px;
+            text-align: center;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid var(--border-glass);
+            border-top: 4px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 1.5rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .result-content {
+            display: none;
+            animation: fadeIn 0.4s ease forwards;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-glass);
+            margin-bottom: 1.5rem;
+        }
+
+        .result-title {
+            font-family: var(--font-heading);
+            font-size: 1.25rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .result-student-info {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+
+        /* AI Feedback Text Formatting Styles */
+        .markdown-body {
+            font-size: 0.975rem;
+            line-height: 1.7;
+        }
+
+        .markdown-body strong {
+            color: var(--primary);
+            font-family: var(--font-heading);
+            font-size: 1.05rem;
+            display: inline-block;
+            margin-top: 1rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .markdown-body p {
+            margin-bottom: 1rem;
+        }
+
+        .markdown-body ul {
+            margin-left: 1.25rem;
+            margin-bottom: 1rem;
+        }
+
+        .markdown-body li {
+            margin-bottom: 0.5rem;
+        }
+
+        /* Editor Mode Style */
+        .ai-editor-textarea {
+            width: 100%;
+            min-height: 380px;
+            font-family: var(--font-main);
+            font-size: 0.95rem;
+            line-height: 1.6;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-glass);
+            border-radius: 8px;
+            padding: 1rem;
+            color: var(--text-main);
+            outline: none;
+            resize: vertical;
+            display: none;
+        }
+
+        [data-theme="light"] .ai-editor-textarea {
+            background: rgba(0, 0, 0, 0.01);
+        }
+
+        /* Notifications & Badges */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.25rem 0.6rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .badge-success {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--secondary);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .badge-warning {
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--warning);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+
+        .badge-danger {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--danger);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        /* Modals & Settings Overlay */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(8px);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+            animation: fadeIn 0.2s ease forwards;
+        }
+
+        .modal-container {
+            background: var(--bg-body);
+            border: 1px solid var(--border-glass);
+            border-radius: 16px;
+            max-width: 800px;
+            width: 100%;
+            max-height: 85vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+            animation: slideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(30px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.25rem 1.75rem;
+            border-bottom: 1px solid var(--border-glass);
+            position: sticky;
+            top: 0;
+            background: var(--bg-body);
+            z-index: 10;
+        }
+
+        .modal-title {
+            font-family: var(--font-heading);
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--text-muted);
+            transition: color 0.2s;
+        }
+
+        .modal-close:hover {
+            color: var(--text-main);
+        }
+
+        .modal-body {
+            padding: 1.75rem;
+        }
+
+        /* Settings Table & Tabs */
+        .settings-tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid var(--border-glass);
+            padding-bottom: 0.5rem;
+        }
+
+        .settings-tab-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-family: var(--font-heading);
+            font-weight: 600;
+            font-size: 0.95rem;
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-radius: 6px;
+        }
+
+        .settings-tab-btn:hover {
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .settings-tab-btn.active {
+            color: var(--primary);
+            background: rgba(99, 102, 241, 0.08);
+        }
+
+        .settings-tab-content {
+            display: none;
+        }
+
+        .settings-tab-content.active {
+            display: block;
+        }
+
+        .settings-table-wrapper {
+            max-height: 350px;
+            overflow-y: auto;
+            border: 1px solid var(--border-glass);
+            border-radius: 10px;
+            margin-top: 1rem;
+        }
+
+        .settings-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.875rem;
+            text-align: left;
+        }
+
+        .settings-table th, .settings-table td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border-glass);
+        }
+
+        .settings-table th {
+            background: rgba(255, 255, 255, 0.02);
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+
+        .settings-table input[type="text"], .settings-table textarea {
+            padding: 0.4rem 0.75rem;
+            font-size: 0.85rem;
+        }
+
+        /* History & Queue Panels (Below main grid) */
+        .bottom-panels {
+            margin-top: 3rem;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2rem;
+        }
+
+        @media (min-width: 1024px) {
+            .bottom-panels {
+                grid-template-columns: 2fr 1fr;
+            }
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .panel-title {
+            font-family: var(--font-heading);
+            font-size: 1.2rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* History List & Table */
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+            border-radius: 12px;
+            border: 1px solid var(--border-glass);
+        }
+
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+            text-align: left;
+        }
+
+        .history-table th, .history-table td {
+            padding: 0.85rem 1.2rem;
+            border-bottom: 1px solid var(--border-glass);
+        }
+
+        .history-table th {
+            background: rgba(255, 255, 255, 0.02);
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        [data-theme="light"] .history-table th {
+            background: rgba(0, 0, 0, 0.02);
+        }
+
+        .history-table tbody tr {
+            cursor: pointer;
+            transition: background var(--transition-speed);
+        }
+
+        .history-table tbody tr:hover {
+            background: rgba(99, 102, 241, 0.04);
+        }
+
+        .history-table .actions-cell {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        /* Empty state for logs */
+        .empty-log {
+            padding: 3rem 1.5rem;
+            text-align: center;
+            color: var(--text-muted);
+        }
+
+        /* Sync Queue Items */
+        .queue-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            max-height: 350px;
+            overflow-y: auto;
+        }
+
+        .queue-item {
+            background: rgba(239, 68, 68, 0.03);
+            border: 1px solid rgba(239, 68, 68, 0.15);
+            border-radius: 12px;
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .queue-item-info h5 {
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .queue-item-info p {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 0.1rem;
+        }
+
+        /* Custom Notification Toast */
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: #111827;
+            border: 1px solid var(--border-glass);
+            color: white;
+            border-radius: 10px;
+            padding: 1rem 1.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 1000;
+        }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .toast-success {
+            border-left: 4px solid var(--secondary);
+        }
+
+        .toast-error {
+            border-left: 4px solid var(--danger);
+        }
+
+        .toast-info {
+            border-left: 4px solid var(--primary);
+        }
+
+        /* Word and Character Count Panel */
+        .textarea-footer {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 0.35rem;
+        }
+
+        /* Responsive adjustments for mobile viewports */
+        @media (max-width: 640px) {
+            /* 1. Stack page header vertically */
+            header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1.25rem;
+            }
+            .header-actions {
+                width: 100%;
+                justify-content: flex-end;
+            }
+            
+            /* 2. Stack bottom panel headers vertically */
+            .panel-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.75rem;
+            }
+            
+            /* 3. Stack result actions buttons vertically and make them full-width */
+            #resultActionsBar {
+                flex-direction: column;
+                align-items: stretch !important;
+                gap: 0.5rem !important;
+                width: 100%;
+            }
+            #resultActionsBar .btn {
+                width: 100%;
+            }
+            
+            /* 4. Adjust panel padding for mobile */
+            .glass-panel {
+                padding: 1.25rem;
+            }
+        }
+
+        /* Prevent absolute elements from causing horizontal scroll */
+        html, body {
+            overflow-x: hidden;
+            max-width: 100vw;
+        }
+    </style>
+</head>
+<body>
+    <div class="glow-orb orb-1"></div>
+    <div class="glow-orb orb-2"></div>
+
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <div class="logo-section">
+                <h1>Mini App Chấm Bài 28 Ngày</h1>
+                <p>Trợ lý ảo chấm bài tự động và phân tích tư duy học viên</p>
+            </div>
+            <div class="header-actions">
+                <button class="btn btn-secondary btn-icon" id="themeToggleBtn" title="Chuyển chế độ Sáng/Tối">
+                    <i data-lucide="sun"></i>
+                </button>
+                <button class="btn btn-secondary" id="settingsBtn">
+                    <i data-lucide="settings"></i> Cấu hình
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Workspace -->
+        <main class="app-grid">
+            <!-- Left Panel: Input Form -->
+            <section class="glass-panel">
+                <h2 style="font-family: var(--font-heading); font-size: 1.3rem; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                    <i data-lucide="edit-3" style="color: var(--primary)"></i> Nhập thông tin & bài làm
+                </h2>
+
+                <form id="gradingForm" onsubmit="event.preventDefault();">
+                    <!-- DOCX File drag & drop zone -->
+                    <div class="form-group">
+                        <label>Tải lên File bài làm (.docx)</label>
+                        <div class="upload-dropzone" id="dropzone">
+                            <i data-lucide="file-text" style="width: 28px; height: 28px; color: var(--primary);"></i>
+                            <p>Kéo thả file bài làm <strong>.docx</strong> vào đây hoặc <span>chọn từ máy tính</span></p>
+                            <input type="file" id="docxFileInput" accept=".docx" style="display: none;">
+                        </div>
+                    </div>
+
+                    <!-- Student details -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="studentId">Mã học viên (Optional)</label>
+                            <input type="text" id="studentId" placeholder="Tự điền khi tải docx hoặc nhập tay">
+                        </div>
+                        <div class="form-group">
+                            <label for="studentName">Tên học viên <span style="color: var(--danger)">*</span></label>
+                            <input type="text" id="studentName" placeholder="Tự điền khi tải docx hoặc nhập tay" required>
+                        </div>
+                    </div>
+
+                    <!-- Day Dropdown -->
+                    <div class="form-group">
+                        <label for="daySelect">Ngày học & Chủ đề <span style="color: var(--danger)">*</span></label>
+                        <select id="daySelect" required>
+                            <!-- JS will generate options Day 1 to 28 -->
+                        </select>
+                    </div>
+
+                    <!-- Reflection Question Preview -->
+                    <div class="day-indicator" id="dayPromptPreview">
+                        <h4 id="dayPromptTitle">Ngày 1: Kết nối với chính mình</h4>
+                        <p id="dayPromptText">Câu hỏi phản tư định hướng ở đây...</p>
+                    </div>
+
+                    <!-- Essay Content -->
+                    <div class="form-group">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <label for="essayContent" style="margin-bottom: 0;">Nội dung bài làm <span style="color: var(--danger)">*</span></label>
+                            <button type="button" class="btn btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;" id="pasteBtn" title="Dán nhanh từ Clipboard">
+                                <i data-lucide="clipboard" style="width: 12px; height: 12px;"></i> Dán bài viết
+                            </button>
+                        </div>
+                        <textarea id="essayContent" placeholder="Dán toàn bộ bài làm của học viên vào đây (hoặc hệ thống tự đọc khi tải file docx phía trên)..." required></textarea>
+                        <div class="textarea-footer">
+                            <span id="charCount">0 ký tự</span>
+                            <span id="wordCount">0 từ</span>
+                        </div>
+                    </div>
+
+                    <!-- AI Skills Checklist (Gemma Skills integration) -->
+                    <div class="skills-section">
+                        <label style="display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.25rem;">
+                            <i data-lucide="cpu" style="width: 16px; height: 16px; color: var(--primary);"></i> Kích hoạt Kỹ năng AI Chấm Bài (Gemma Skills)
+                        </label>
+                        <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+                            Tích chọn các kỹ năng bạn muốn Gemma tập trung phân tích cho bài viết này.
+                        </p>
+                        
+                        <div class="skills-grid" id="skillsCheckboxContainer">
+                            <!-- JS generated skills checkboxes -->
+                        </div>
+                    </div>
+
+                    <!-- Action buttons -->
+                    <div class="btn-submit-container">
+                        <button type="submit" class="btn btn-primary" id="submitGradingBtn">
+                            <i data-lucide="sparkles"></i> Bắt đầu chấm bài
+                        </button>
+                    </div>
+                </form>
+            </section>
+
+            <!-- Right Panel: Results -->
+            <section class="glass-panel" style="display: flex; flex-direction: column;">
+                <!-- Result States -->
+                <div class="result-empty" id="resultEmpty">
+                    <i data-lucide="message-square-dashed" style="width: 64px; height: 64px;"></i>
+                    <h3>Chưa có kết quả chấm bài</h3>
+                    <p style="font-size: 0.9rem; margin-top: 0.5rem; max-width: 320px;">
+                        Điền đầy đủ thông tin học viên và nội dung bài làm ở bên trái, sau đó bấm nút "Bắt đầu chấm bài" để xem đánh giá từ AI.
+                    </p>
+                </div>
+
+                <div class="result-loading" id="resultLoading">
+                    <div class="spinner"></div>
+                    <h3>Gemma AI đang phân tích bài viết...</h3>
+                    <p style="font-size: 0.9rem; color: var(--text-muted); margin-top: 0.5rem;">Quá trình này mất khoảng 5-10 giây.</p>
+                </div>
+
+                <div class="result-content" id="resultContent" style="flex: 1; display: none; flex-direction: column; justify-content: space-between;">
+                    <div>
+                        <div class="result-header">
+                            <div>
+                                <h3 class="result-title">
+                                    <i data-lucide="brain-circuit" style="color: var(--secondary)"></i> Kết quả nhận xét AI
+                                </h3>
+                                <div class="result-student-info" id="resultMeta">
+                                    Học viên: Nguyễn Văn A | Ngày học: 5
+                                </div>
+                            </div>
+                            <div id="resultSyncBadge">
+                                <span class="badge badge-success"><i data-lucide="cloud-check" style="width: 12px; height: 12px;"></i> Đã lưu Sheet</span>
+                            </div>
+                        </div>
+
+                        <!-- Main content container: Markdown renderer and Raw textarea editor -->
+                        <div class="glass-panel" style="background: rgba(255,255,255,0.01); border: 1px solid var(--border-glass); border-radius: 12px; padding: 1.25rem; min-height: 400px; max-height: 480px; overflow-y: auto; margin-bottom: 1.5rem; position: relative;">
+                            <!-- Rendered markdown (View Mode) -->
+                            <div class="markdown-body" id="aiReviewOutput"></div>
+                            
+                            <!-- Raw Markdown Editor (Edit Mode) -->
+                            <textarea class="ai-editor-textarea" id="aiReviewEditorTextarea" placeholder="Nhập chỉnh sửa nhận xét của bạn tại đây..."></textarea>
+                        </div>
+
+                        <!-- AI Rewrite Feedback Input Panel (Visible in View Mode, toggleable) -->
+                        <div id="aiFeedbackPanel" style="display: none; margin-bottom: 1.5rem; background: rgba(99, 102, 241, 0.04); border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 12px; padding: 1rem;">
+                            <label for="aiFeedbackInput" style="font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; gap: 0.3rem; margin-bottom: 0.5rem; color: var(--primary);">
+                                <i data-lucide="message-square"></i> Nhập góp ý của chị để AI tự viết lại nhận xét bài làm
+                            </label>
+                            <div style="display: flex; gap: 0.5rem;">
+                                <input type="text" id="aiFeedbackInput" placeholder="Ví dụ: Hãy khích lệ bạn thêm, viết dài hơn hoặc đổi lời khuyên..." style="flex: 1; padding: 0.6rem 0.8rem; font-size: 0.9rem;">
+                                <button type="button" class="btn btn-primary" id="submitAiFeedbackBtn" style="padding: 0.6rem 1.2rem; font-size: 0.9rem; flex-shrink: 0;">
+                                    <i data-lucide="sparkles"></i> AI Viết lại
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Actions Bar for Results -->
+                    <div id="resultActionsBar" style="display: flex; gap: 0.75rem; justify-content: flex-end; align-items: center;">
+                        <!-- Normal buttons (View Mode) -->
+                        <button class="btn btn-secondary" id="aiRewriteToggleBtn">
+                            <i data-lucide="message-square-dashed"></i> Góp ý cho AI
+                        </button>
+                        <button class="btn btn-secondary" id="editResultBtn">
+                            <i data-lucide="edit"></i> Sửa nhận xét
+                        </button>
+                        <button class="btn btn-secondary" id="copyResultBtn">
+                            <i data-lucide="copy"></i> Copy nhận xét
+                        </button>
+
+                        <!-- Editing buttons (Edit Mode) -->
+                        <button class="btn btn-secondary" id="cancelEditBtn" style="display: none;">
+                            <i data-lucide="x"></i> Hủy
+                        </button>
+                        <button class="btn btn-primary" id="saveEditBtn" style="display: none;">
+                            <i data-lucide="save"></i> Lưu & Cập nhật Sheet
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Bottom Panels: History & Sync Queue -->
+        <section class="bottom-panels">
+            <!-- History Dashboard -->
+            <div class="glass-panel">
+                <div class="panel-header">
+                    <h3 class="panel-title">
+                        <i data-lucide="history" style="color: var(--primary)"></i> Lịch sử chấm bài gần đây
+                    </h3>
+                    <button class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;" id="clearHistoryBtn">
+                        Xóa lịch sử
+                    </button>
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="history-table" id="historyTable">
+                        <thead>
+                            <tr>
+                                <th>Thời gian</th>
+                                <th>Mã HV</th>
+                                <th>Tên học viên</th>
+                                <th>Ngày học</th>
+                                <th>Trạng thái</th>
+                                <th>Hành động</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyList">
+                            <!-- JS loaded history items -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Sync Queue (Unsynced files) -->
+            <div class="glass-panel">
+                <div class="panel-header">
+                    <h3 class="panel-title" style="color: var(--danger)">
+                        <i data-lucide="cloud-lightning"></i> Hàng đợi đồng bộ lỗi
+                    </h3>
+                    <button class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.8rem; display: none;" id="retryAllSyncBtn">
+                        Đồng bộ lại
+                    </button>
+                </div>
+                
+                <div class="queue-list" id="queueList">
+                    <!-- Unsynced items -->
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Configuration Modal (Settings) -->
+    <div class="modal" id="settingsModal">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h3 class="modal-title"><i data-lucide="sliders" style="vertical-align: middle; margin-right: 0.5rem; color: var(--primary)"></i> Cấu hình ứng dụng</h3>
+                <button class="modal-close" id="closeSettingsBtn">
+                    <i data-lucide="x" style="width: 24px; height: 24px;"></i>
+                </button>
+            </div>
+            
+            <div class="modal-body">
+                <!-- Settings Tabs -->
+                <div class="settings-tabs">
+                    <button class="settings-tab-btn active" data-target="tabConnection">Kết nối & Luật chung</button>
+                    <button class="settings-tab-btn" data-target="tabSkills">Kỹ năng AI (Gemma Skills)</button>
+                    <button class="settings-tab-btn" data-target="tabDays">28 câu hỏi phản tư</button>
+                </div>
+
+                <!-- Tab 1: Connection & Base Prompts -->
+                <div class="settings-tab-content active" id="tabConnection">
+                    <h4 style="font-family: var(--font-heading); font-size: 1.05rem; margin-bottom: 1rem; border-bottom: 1px solid var(--border-glass); padding-bottom: 0.25rem;">Kết nối hệ thống</h4>
+                    
+                    <div class="form-group">
+                        <label for="gemmaApiKey">Google AI Studio API Key <span style="color: var(--danger)">*</span></label>
+                        <input type="text" id="gemmaApiKey" placeholder="AI Studio API Key của bạn (bắt đầu bằng AIza...)">
+                        <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
+                            Tạo khóa miễn phí tại <a href="https://aistudio.google.com/" target="_blank" style="color: var(--primary); text-decoration: none;">Google AI Studio</a>. Khóa này chỉ lưu trữ cục bộ trên máy tính của bạn.
+                        </p>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="appsScriptUrl">Google Apps Script Web App URL <span style="color: var(--danger)">*</span></label>
+                        <input type="text" id="appsScriptUrl" placeholder="URL ứng dụng web Google Apps Script vừa deploy...">
+                        <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
+                            Được tạo sau khi bạn Triển khai (Deploy) script Code.gs trong Google Sheets của mình.
+                        </p>
+                    </div>
+
+                    <div class="form-group" style="margin-top: 1.5rem;">
+                        <label for="systemPrompt">AI System Instruction (Luật chấm bài cơ bản) <span style="color: var(--danger)">*</span></label>
+                        <textarea id="systemPrompt" placeholder="Thiết lập vai trò, luật định dạng chung và cấu trúc nhận xét..." style="min-height: 180px; font-family: monospace; font-size: 0.85rem; line-height: 1.5;"></textarea>
+                        <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
+                            Thiết lập cấu trúc bắt buộc của kết quả nhận xét (Tổng quan, Phân tích, Lời khuyên) và cách định dạng. Các kỹ năng chi tiết sẽ được chọn và cấu hình trong tab "Kỹ năng AI".
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Tab 2: AI Skills Management (Gemma Skills) -->
+                <div class="settings-tab-content" id="tabSkills">
+                    <h4 style="font-family: var(--font-heading); font-size: 1.05rem; margin-bottom: 0.5rem; border-bottom: 1px solid var(--border-glass); padding-bottom: 0.25rem;">
+                        Quản lý Kỹ năng AI (Gemma Skills)
+                    </h4>
+                    <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">
+                        Chỉnh sửa prompt hướng dẫn chi tiết cho từng kỹ năng riêng biệt. Các kỹ năng này sẽ xuất hiện dưới dạng Checkbox ở form chấm bài ngoài màn hình chính để bạn bật/tắt động.
+                    </p>
+
+                    <div class="settings-table-wrapper" style="max-height: 380px;">
+                        <table class="settings-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 180px;">Tên kỹ năng</th>
+                                    <th style="width: 220px;">Mô tả ngắn</th>
+                                    <th>Prompt Hướng dẫn AI (System instruction bổ sung)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="skillsSettingsTableBody">
+                                <!-- Dynamic generated rows for skills -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Tab 3: Day Questions Configuration -->
+                <div class="settings-tab-content" id="tabDays">
+                    <h4 style="font-family: var(--font-heading); font-size: 1.05rem; margin-bottom: 0.5rem; border-bottom: 1px solid var(--border-glass); padding-bottom: 0.25rem;">
+                        Danh sách câu hỏi 28 ngày học
+                    </h4>
+                    <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">
+                        Chỉnh sửa Tiêu đề chủ đề và Câu hỏi phản tư định hướng tương ứng của từng ngày học.
+                    </p>
+
+                    <div class="settings-table-wrapper">
+                        <table class="settings-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 80px;">Ngày</th>
+                                    <th style="width: 220px;">Tên chủ đề</th>
+                                    <th>Câu hỏi phản tư định hướng</th>
+                                </tr>
+                            </thead>
+                            <tbody id="daysSettingsTableBody">
+                                <!-- Dynamic generated rows Day 1 to 28 -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Modal footer actions -->
+                <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 2rem; border-top: 1px solid var(--border-glass); padding-top: 1.25rem;">
+                    <button class="btn btn-secondary" id="resetDefaultsBtn">Khôi phục mặc định</button>
+                    <button class="btn btn-primary" id="saveSettingsBtn">Lưu cấu hình</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div class="toast" id="toast">
+        <i id="toastIcon" data-lucide="info"></i>
+        <span id="toastMessage">Thông báo xuất hiện ở đây</span>
+    </div>
+
+    <script>
+        // Actual Reflection Questions & Topics loaded from the docx file
+        const DEFAULT_DAYS_DATA = {
+            1: { title: "Xả suy nghĩ thô", question: "Sau khi hoàn thành, hãy dành vài phút để suy nghĩ về những câu hỏi sau:\n1. Trong bài viết của mình, điều gì xuất hiện nhiều nhất? (lo lắng, áp lực, so sánh, mơ hồ...)\n2. Có điều gì mình viết ra mà trước đó mình chưa từng nhận ra không?\n3. Khi đọc lại, mình có hiểu rõ mình đang nghĩ gì không?\n4. Mình có cố viết cho hay không? (Lưu ý: Không phải viết hay, mà là viết thật)." },
+            2: { title: "Gọi tên suy nghĩ", question: "Sau khi viết xong, hãy dành vài phút để nhìn lại:\n1. Trong 5 câu, ý nào lặp lại về mặt cảm xúc? (ví dụ: lo lắng, thiếu tự tin...)\n2. Có câu nào bạn muốn giải thích thêm nhưng đã chủ động dừng lại không? (Luyện 'giữ ý' thay vì 'kể dài')\n3. Bạn thấy ngày này dễ hơn hay khó hơn ngày 1? (Yêu cầu kỷ luật cao hơn)\n4. Sau khi tách ra, bạn có hiểu rõ mình hơn không?" },
+            3: { title: "Nhìn thẳng vấn đề", question: "Sau khi hoàn thành, hãy dành vài phút để suy nghĩ:\n1. Bài viết của mình có chỗ nào đang giải thích/biện hộ không?\n2. Mình đã mô tả đủ cụ thể chưa? Hay vẫn còn dùng các từ chung chung như 'chưa tốt', 'chưa ổn'?\n3. Sau khi viết xong, mình có nhìn rõ bản chất vấn đề hơn không?\n4. Có điều gì khiến mình bất ngờ khi viết ra không? (Vấn đề thật có giống ban đầu nghĩ?)" },
+            4: { title: "Ép ngắn để ép rõ", question: "Sau khi hoàn thành, hãy dành vài phút để suy nghĩ:\n1. Có câu nào bạn thấy 'khó cắt bỏ' không? (Những câu khó cắt thường là do chưa rõ ý)\n2. Sau khi rút ngắn, bạn có thấy vấn đề hiện lên rõ hơn không?\n3. Bạn có nhận ra mình đã dùng nhiều từ thừa không?\n4. Câu nào sau khi rút ngắn trở nên mạnh mẽ và rõ ý hơn?" },
+            5: { title: "Tập trung vào điều quan trọng", question: "Sau khi hoàn thành, hãy dành vài phút để suy nghĩ:\n1. Ba điều này có thực sự là điều bạn lo lắng nhất lúc này không? Hay chọn đại cho xong?\n2. Bạn có thấy khó chịu khi phải bỏ bớt những nỗi lo khác không?\n3. Trong 3 điều này, điều nào xuất hiện thường xuyên nhất trong đầu bạn?\n4. Sau khi gọi tên được nỗi lo, bạn có thấy nhẹ đầu và bớt mơ hồ hơn không?" },
+            6: { title: "Chạm vào nỗi sợ thật", question: "Sau khi hoàn thành, hãy dành vài phút để suy nghĩ:\n1. Câu mình viết có thực sự là điều mình sợ nhất không? Hay chỉ là phiên bản dễ chấp nhận?\n2. Mình có đang né tránh điều gì không?\n3. Khi đọc lại câu đó, mình có cảm giác rung động hoặc dừng lại suy nghĩ không? (Dấu hiệu câu thật)\n4. Nỗi sợ này có liên quan đến các nỗi sợ cũ (pattern) đã viết ở ngày trước không?" },
+            7: { title: "Nhìn lại suy nghĩ", question: "Sau khi hoàn thành, hãy dành vài phút để suy nghĩ:\n1. Điều mình nhận ra sau một tuần có làm mình bất ngờ không?\n2. Có suy nghĩ nào lặp lại nhiều lần nhất trong tuần qua? (Đây là vấn đề cần chú ý)\n3. Mình có đang thực sự trung thực với bản thân không?\n4. Sau 7 ngày, mình có thấy suy nghĩ của mình rõ ràng hơn không?" },
+            8: { title: "Sắp xếp vấn đề theo trình tự", question: "Sau khi hoàn thành, hãy dành vài phút để suy nghĩ:\n1. Người khác đọc bài này có cần hỏi lại không? (Nếu họ hỏi 'rồi sao nữa?', bạn có thể đang bị thiếu bước)\n2. Bài viết của mình có bị đảo lộn thứ tự trước sau không?\n3. Mình có nhét quá nhiều ý phụ vào cùng một câu không?\n4. Sau khi viết theo trình tự thời gian/logic, mình có thấy dễ hiểu hơn không?" },
+            9: { title: "Combo 1 ý chính - 3 ý phụ", question: "Sau khi hoàn thành, hãy dành vài phút để suy nghĩ:\n1. Nếu chỉ đọc câu đầu tiên, người khác có hiểu ngay bạn muốn nói gì không? (Kiểm tra ý chính)\n2. 3 câu tiếp theo có thực sự bổ trợ/giải thích cho câu chính không? Hay viết thêm cho đủ dòng?\n3. Nếu thử bỏ đi 1 câu phụ, bài viết có bị yếu đi không?\n4. Bạn có đang viết dài dòng hơn mức cần thiết không? Hãy thử rút gọn." },
+            10: { title: "Logic với cấu trúc cơ bản", question: "Sau khi hoàn thành, hãy dành vài phút để suy nghĩ:\n1. Người đọc có hiểu ngay lập tức bạn đang nói về điều gì ở phần mở không?\n2. Các lý do đưa ra ở phần thân bài có thực sự phục vụ cho ý định cải thiện không?\n3. Phần kết luận có rõ ràng không? Bạn có thực sự viết ra hành động 'mình sẽ làm gì' không?\n4. Nếu bỏ phần kết luận, bài viết có bị hụt hẫng không?" },
+            11: { title: "Viết về giải pháp (Problem - Cause - Solution)", question: "Sau khi hoàn thành, hãy dành vài phút để suy nghĩ:\n1. Mình có đang nhầm lẫn giữa 'vấn đề' (hiện tượng) và 'nguyên nhân' (bản chất) không?\n2. Nguyên nhân mình đưa ra đã đủ cụ thể chưa, hay vẫn mơ hồ?\n3. Giải pháp có giải quyết đúng tận gốc của nguyên nhân không? Hay chỉ là hành động sáo rỗng?\n4. Nếu áp dụng giải pháp này, vấn đề có thực sự được giải quyết dứt điểm không?" },
+            12: { title: "Tư duy chuyển đổi (Before - After - Bridge)", question: "Sau khi hoàn thành, hãy dành vài phút để suy nghĩ:\n1. Phần mô tả 'hiện tại' (Before) của mình đã đủ cụ thể chưa?\n2. Phần 'mong muốn' (After) có rõ ràng, đo lường được không?\n3. Chiếc cầu nối 'cần làm gì' (Bridge) có thực tế và giúp đi được từ Before sang After không?\n4. Khi đọc lại, mình có cảm nhận rõ ràng sự thay đổi/động lực dịch chuyển không?" },
+            13: { title: "So sánh 2 cách viết", question: "Sau khi hoàn thành, hãy dành vài phút để suy nghĩ:\n1. Đoạn viết tự do của mình có bị dài hoặc rối rắm không?\n2. Đoạn viết có cấu trúc có dễ hiểu và rõ ràng hơn không? Dễ hơn ở điểm nào?\n3. Khi viết theo framework, mình có thấy kiểm soát luồng tư duy tốt hơn không?\n4. Người khác đọc vào sẽ hiểu và nắm bắt đoạn nào nhanh hơn?" },
+            14: { title: "Chọn Framework phù hợp", question: "Sau khi hoàn thành, hãy dành vài phút để suy nghĩ:\n1. Mình đã chọn cấu trúc (framework) dựa trên mục tiêu muốn truyền tải hay chọn theo thói quen?\n2. Framework đã chọn có phù hợp với đặc thù nội dung bài viết không?\n3. Nếu đổi thử sang framework khác, bài viết có trở nên mạch lạc và sắc bén hơn không?\n4. Việc chọn trước cấu trúc giúp mình viết nhanh và định hình bài tốt hơn không?" },
+            15: { title: "Viết từ nỗi khó chịu", question: "Sau khi hoàn thành, hãy dành vài phút để suy nghĩ:\n1. Đoạn viết của mình có thật không? Hay mình đang cố viết cho 'nghe có vẻ hay'?\n2. Mình có đang né tránh những cảm xúc tiêu cực thật sự bên trong không?\n3. Có điều gì mình muốn viết nhưng chưa dám đặt bút viết ra không?\n4. Người khác đọc bài này có cảm nhận được cảm xúc thật của mình không, hay chỉ thấy thông tin?" },
+            16: { title: "Gọi tên nỗi đau người khác", question: "Sau khi hoàn thành, hãy tự hỏi:\n1. Đoạn viết này có chỉ là câu chuyện cá nhân đơn thuần không? Hay người khác có thể thấy mình trong đó?\n2. Mình có đang viết quá chung chung không? Các ví dụ có đủ cụ thể để người đọc nhận ra không?\n3. Nếu một người lạ đọc, họ có thể thốt lên: 'Đây chính là câu chuyện của mình' không?\n4. Mình đang viết để trình bày bài học đúng đắn hay viết từ trải nghiệm đau đáu có thật?" },
+            17: { title: "Insight cơ bản", question: "Sau khi viết xong, hãy tự hỏi:\n1. Điều mình viết có phải chỉ là mô tả bề mặt (sự kiện) không? Hay đã chạm tới insight (nguyên nhân ngầm hiểu)?\n2. Người khác đọc có thể gật gù nói: 'Đúng thế, bình thường mình không nhận ra' không?\n3. Mình viết từ điều mình thực sự ngộ ra hay chỉ viết một câu triết lý sáo rỗng cho xong bài?\n4. Insight này có cụ thể không? Hay vẫn còn mơ hồ, chung chung?" },
+            18: { title: "Viết câu mở gây chú ý", question: "Sau khi hoàn thành bài tập, hãy tự hỏi:\n1. Trong 5 câu mở đầu được thử nghiệm, câu nào khiến mình thấy 'có lực' và muốn đọc tiếp nhất? Vì sao?\n2. Mình có đang viết câu mở bài quá an toàn và nhàm chán không?\n3. Có câu nào thực sự tạo ra tò mò kích thích trí tò mò, hay chỉ là diễn đạt lại ý cũ?\n4. Mình đang viết để báo cáo nội dung hay để kéo người đọc vào thế giới của bài viết?" },
+            19: { title: "Review quán cà phê (có chiều sâu)", question: "Sau khi viết xong, hãy tự hỏi:\n1. Bài viết của mình đang dừng lại ở kể lại (review thông thường) hay đã có sự diễn giải (phản tư)?\n2. Nỗi khó chịu (Pain) mình đưa ra có đủ cụ thể, chân thực không?\n3. Ý tưởng ngầm hiểu (Insight) rút ra có thực chất không?\n4. Người khác đọc bài này có thấy được trải nghiệm cảm xúc cá nhân của họ thông qua câu chuyện của mình không?" },
+            20: { title: "Bạn đang viết cho ai?", question: "Hãy tự hỏi sau khi viết:\n1. Bài viết của mình đang hướng đến đối tượng độc giả cụ thể nào? Họ có hiện lên rõ nét không?\n2. Nếu đổi đối tượng độc giả, bài viết này có còn phù hợp không? Cần sửa gì?\n3. Mình đang viết theo cảm nhận cá nhân hay viết về điều mà độc giả quan tâm?\n4. Người thuộc nhóm độc giả mục tiêu khi đọc có thấy đúng 'gu' và chạm tới nhu cầu của họ không?" },
+            21: { title: "Viết về một thói quen", question: "Sau khi hoàn thành, hãy tự hỏi:\n1. Mình đã kết hợp đủ 3 yếu tố: hook (mở đầu ấn tượng) – insight (ngộ nhận) – liên hệ người đọc chưa?\n2. Ý tưởng cốt lõi của mình có thực sự là một ngộ nhận sâu sắc hay chỉ là lời khuyên sáo rỗng?\n3. Phần liên hệ độc giả có cụ thể không? Người khác đọc có thấy bóng dáng thói quen của họ ở đó không?\n4. Nội dung bài viết của mình đang hướng người đọc tới cảm xúc tích cực hay tiêu cực?" },
+            22: { title: "Viết để tạo giá trị", question: "Sau khi hoàn thành bài viết, hãy tự hỏi:\n1. Bài viết của mình có mô tả đúng và trúng khó khăn của một người mới bắt đầu không?\n2. Các bước hướng dẫn hành động có rõ ràng, dễ hiểu và logic không?\n3. Người đọc có thể thực hành ngay lập tức sau khi đọc bài viết của mình không?\n4. Có nhiều lời khuyên chung chung kiểu 'hãy cố lên', 'hãy kiên trì' không? (Cần thay bằng giải pháp cụ thể)." },
+            23: { title: "Viết chia sẻ phương pháp", question: "Sau khi hoàn thành, hãy tự hỏi:\n1. Phương pháp này có thực sự là cách mình đang áp dụng hàng ngày không? Hay mình đang 'vẽ ra cho đẹp'?\n2. Nếu thực hiện lại công việc này, mình có làm đúng trình tự các bước vừa viết không?\n3. Một người chưa biết gì đọc xong có tự làm theo được không?\n4. Điểm độc đáo/khác biệt nhất trong phương pháp của mình so với đám đông là gì?" },
+            24: { title: "Tái sử dụng nội dung", question: "Sau khi viết xong, hãy tự hỏi:\n1. Mỗi phiên bản bài viết hướng tới đối tượng nào? Chân dung họ có rõ ràng không?\n2. Mình đã thay đổi những gì giữa các phiên bản: từ ngữ, cách chọn ví dụ hay thay đổi cả góc nhìn?\n3. Người đọc của từng phiên bản có thấy bài viết được 'đo ni đóng giày' riêng cho họ không?\n4. Nếu chỉ đọc độc lập 1 phiên bản, họ có biết ngay bài này viết cho họ không?" },
+            25: { title: "Nâng cấp bài viết thành tài sản", question: "Sau khi hoàn thành, hãy tự hỏi:\n1. Bài viết của mình đang ở mức chia sẻ câu chuyện hay đã nâng cấp thành tài sản có giá trị sử dụng lâu dài?\n2. Ý tưởng ngầm hiểu (Insight) rút ra đã đủ sâu sắc chưa?\n3. Độc giả có thể lưu lại bài viết này để dùng làm biểu mẫu/check-list sau này không?\n4. Bản thân mình đọc lại sau 1 tuần có thấy bài viết này hữu ích và áp dụng được cho chính mình không?" },
+            26: { title: "Đánh giá tổng quát", question: "Ngày tự do. Hãy tự đánh giá và phản tư bất kỳ vấn đề gì bạn quan tâm sâu sắc lúc này. Không có câu hỏi định hướng cố định." },
+            27: { title: "Ghi nhận và phân tích phản hồi", question: "Hãy trả lời ngắn gọn 3 câu hỏi sau:\n1. Điều gì khiến người khác phản hồi nhiều nhất? (Họ tương tác vào câu nào? Phản ứng với ý/cảm xúc nào?)\n2. Có điểm nào trong bài viết chưa rõ ràng hoặc chưa đủ hấp dẫn khiến người khác phải hỏi lại không?\n3. Bài viết này thực sự mang lại giá trị gì cho người đọc? Giúp họ giải quyết điều gì hay chỉ làm họ thấy đúng?\n\n*RÚT RA 1 ĐIỀU DUY NHẤT: Nếu viết lại bài này, mình sẽ thay đổi/cải thiện điều gì?" },
+            28: { title: "Tổng kết hành trình 28 ngày", question: "Sau 28 ngày viết:\n1. Trước và sau hành trình, cách nghĩ/tư duy của mình khác biệt rõ rệt nhất ở điểm nào?\n2. Điều gì mình từng không nhận ra ở bản thân, nhưng bây giờ đã hiện lên rõ mồn một?\n3. Bài học tư duy/viết nào mình tâm đắc nhất và cam kết áp dụng lâu dài?\n4. Nếu dừng lại ở đây, mình có dễ quay lại thói quen cũ không? Làm sao để duy trì?\n5. Mình muốn định vị bản thân trở thành người như thế nào sau hành trình này?" }
+        };
+
+        // Default System Prompt
+        const DEFAULT_SYSTEM_PROMPT = 
+            "Bạn là giảng viên chuyên nghiệp, đóng vai trò là người đồng hành chấm bài viết cho khóa học '28 Ngày Rèn Tư Duy Qua Viết'.\n" +
+            "Nhiệm vụ của bạn là nhận xét bài viết phản tư của học viên dựa trên câu hỏi định hướng của ngày học.\n\n" +
+            "YÊU CẦU QUAN TRỌNG VỀ ĐỊNH DẠNG VÀ PHONG CÁCH:\n" +
+            "1. ĐỘ DÀI: Nhận xét ngắn gọn, cô đọng, tối đa 200 từ.\n" +
+            "2. NGÔN NGỮ: Sử dụng tiếng Việt chuẩn xác.\n" +
+            "3. CẤU TRÚC PHẢN HỒI (BẮT BUỘC): Trả về nhận xét theo đúng cấu trúc sau:\n" +
+            "**Tổng quan**: [Đánh giá chung về bài viết và sự liên kết với câu hỏi định hướng của ngày học]\n" +
+            "**Phân tích**:\n" +
+            "- *Điểm tốt*: [Liệt kê các điểm sáng dựa trên các kỹ năng được kích hoạt]\n" +
+            "- *Điểm cần cải thiện*: [Liệt kê các điểm cần đào sâu hoặc sửa đổi dựa trên các kỹ năng được kích hoạt]\n" +
+            "**Lời khuyên**: [Đưa ra bài tập phản tư nhỏ hoặc lời khuyên cụ thể]\n\n" +
+            "LƯU Ý THÊM: Học viên có thể dán cả tiêu đề/đề bài lẫn lộn vào bài làm, bạn hãy tự bóc tách và chỉ tập trung nhận xét phần bài làm thực tế của học viên.";
+
+        // Default AI Skills (Modular Gemma Skills)
+        const DEFAULT_AI_SKILLS = [
+            {
+                id: "reflection",
+                name: "Tư duy phản tư",
+                description: "Đánh giá chiều sâu tự nhận thức và mức độ thấu hiểu bài học phản tư.",
+                instruction: "PHÂN TÍCH TƯ DUY PHẢN TƯ:\n- Nhận xét xem em đã thực sự đào sâu thế giới nội tâm và trung thực với bản thân chưa.\n- Chỉ ra các chi tiết phản tư đắt giá hoặc các nút thắt nhận thức mà em đã mở khóa trong bài làm."
+            },
+            {
+                id: "logic",
+                name: "Logic & Lập luận",
+                description: "Kiểm tra cấu trúc bài viết, tính liên kết mạch lạc giữa các ý.",
+                instruction: "PHÂN TÍCH LOGIC & LẬP LUẬN:\n- Đánh giá xem cách trình bày bài làm của em có mạch lạc, dễ hiểu không.\n- Chỉ ra các điểm mâu thuẫn trong lập luận phản tư (nếu có) và hướng dẫn em cách xâu chuỗi lập luận chặt chẽ."
+            },
+            {
+                id: "style",
+                name: "Hành văn & Ngôn từ",
+                description: "Rà soát lỗi chính tả, đề xuất sửa câu và gợi ý từ vựng sắc bén.",
+                instruction: "PHÂN TÍCH HÀNH VĂN & NGÔN TỪ:\n- Chỉ ra các lỗi chính tả, lặp từ hoặc câu văn quá dài dòng.\n- Đề xuất cách viết cô đọng, súc tích hơn hoặc gợi ý 1-2 từ ngữ sắc bén để làm nổi bật thông điệp bài viết."
+            },
+            {
+                id: "coaching",
+                name: "Đồng hành & Khích lệ",
+                description: "Đảm bảo AI dùng xưng xô 'chị - em' ấm áp, truyền lửa nâng đỡ.",
+                instruction: "PHONG CÁCH ĐỒNG HÀNH & KHÍCH LỆ:\n- Bắt buộc xưng hô 'chị' và gọi học viên là 'em'.\n- Giữ giọng văn nhẹ nhàng, thấu hiểu, mang tính định hướng nâng đỡ tinh thần và khích lệ em tiếp tục duy trì thói quen viết."
+            }
+        ];
+
+        // Application State
+        let appConfig = {
+            apiKey: "",
+            appsScriptUrl: "",
+            systemPrompt: DEFAULT_SYSTEM_PROMPT,
+            daysData: JSON.parse(JSON.stringify(DEFAULT_DAYS_DATA)),
+            aiSkills: JSON.parse(JSON.stringify(DEFAULT_AI_SKILLS))
+        };
+        let gradingHistory = [];
+        let syncQueue = [];
+        let currentGradingResult = null;
+        let isEditMode = false;
+
+        // Initialize App
+        window.addEventListener("DOMContentLoaded", () => {
+            loadConfig();
+            loadHistory();
+            loadSyncQueue();
+            initDaySelect();
+            initTheme();
+            renderDaysSettingsTable();
+            renderSkillsSettingsTable();
+            renderMainSkillsCheckboxes();
+            updateDayPromptPreview();
+            registerEventListeners();
+            lucide.createIcons();
+        });
+
+        // Config Management
+        function loadConfig() {
+            const savedConfig = localStorage.getItem("mini_grading_config");
+            if (savedConfig) {
+                try {
+                    const parsed = JSON.parse(savedConfig);
+                    appConfig = { ...appConfig, ...parsed };
+                } catch (e) {
+                    console.error("Lỗi đọc cấu hình local:", e);
+                }
+            }
+            
+            if (!appConfig.systemPrompt) {
+                appConfig.systemPrompt = DEFAULT_SYSTEM_PROMPT;
+            }
+            if (!appConfig.aiSkills || appConfig.aiSkills.length === 0) {
+                appConfig.aiSkills = JSON.parse(JSON.stringify(DEFAULT_AI_SKILLS));
+            }
+            
+            document.getElementById("gemmaApiKey").value = appConfig.apiKey;
+            document.getElementById("appsScriptUrl").value = appConfig.appsScriptUrl;
+            document.getElementById("systemPrompt").value = appConfig.systemPrompt;
+        }
+
+        function saveConfig() {
+            appConfig.apiKey = document.getElementById("gemmaApiKey").value.trim();
+            appConfig.appsScriptUrl = document.getElementById("appsScriptUrl").value.trim();
+            appConfig.systemPrompt = document.getElementById("systemPrompt").value.trim();
+            
+            for (let i = 1; i <= 28; i++) {
+                const titleInput = document.getElementById(`day-title-${i}`);
+                const questionInput = document.getElementById(`day-question-${i}`);
+                if (titleInput && questionInput) {
+                    appConfig.daysData[i] = {
+                        title: titleInput.value.trim(),
+                        question: questionInput.value.trim()
+                    };
+                }
+            }
+
+            appConfig.aiSkills.forEach(skill => {
+                const nameInput = document.getElementById(`skill-name-${skill.id}`);
+                const descInput = document.getElementById(`skill-desc-${skill.id}`);
+                const instTextarea = document.getElementById(`skill-inst-${skill.id}`);
+                if (nameInput && descInput && instTextarea) {
+                    skill.name = nameInput.value.trim();
+                    skill.description = descInput.value.trim();
+                    skill.instruction = instTextarea.value.trim();
+                }
+            });
+
+            localStorage.setItem("mini_grading_config", JSON.stringify(appConfig));
+            showToast("Đã lưu cấu hình thành công!", "success");
+            
+            initDaySelect();
+            renderMainSkillsCheckboxes();
+            updateDayPromptPreview();
+            closeModal();
+        }
+
+        function resetConfigToDefaults() {
+            const activeTab = document.querySelector(".settings-tab-btn.active").getAttribute("data-target");
+            
+            if (activeTab === "tabConnection") {
+                if (confirm("Khôi phục Luật chấm bài cơ bản về mặc định?")) {
+                    appConfig.systemPrompt = DEFAULT_SYSTEM_PROMPT;
+                    document.getElementById("systemPrompt").value = DEFAULT_SYSTEM_PROMPT;
+                    showToast("Đã khôi phục luật chung. Bấm 'Lưu cấu hình' để xác nhận.", "info");
+                }
+            } else if (activeTab === "tabSkills") {
+                if (confirm("Khôi phục toàn bộ Kỹ năng AI (Gemma Skills) về mặc định?")) {
+                    appConfig.aiSkills = JSON.parse(JSON.stringify(DEFAULT_AI_SKILLS));
+                    renderSkillsSettingsTable();
+                    showToast("Đã khôi phục Kỹ năng AI mặc định. Bấm 'Lưu cấu hình' để xác nhận.", "info");
+                }
+            } else if (activeTab === "tabDays") {
+                if (confirm("Khôi phục toàn bộ 28 ngày học về mặc định?")) {
+                    appConfig.daysData = JSON.parse(JSON.stringify(DEFAULT_DAYS_DATA));
+                    renderDaysSettingsTable();
+                    showToast("Đã khôi phục 28 ngày mặc định. Bấm 'Lưu cấu hình' để xác nhận.", "info");
+                }
+            }
+        }
+
+        // History Management
+        function loadHistory() {
+            const savedHistory = localStorage.getItem("mini_grading_history");
+            if (savedHistory) {
+                try {
+                    gradingHistory = JSON.parse(savedHistory);
+                } catch (e) {
+                    console.error("Lỗi đọc lịch sử:", e);
+                }
+            }
+            renderHistoryTable();
+        }
+
+        function saveHistory() {
+            localStorage.setItem("mini_grading_history", JSON.stringify(gradingHistory));
+            renderHistoryTable();
+        }
+
+        function addToHistory(item) {
+            gradingHistory.unshift(item);
+            if (gradingHistory.length > 50) {
+                gradingHistory.pop();
+            }
+            saveHistory();
+        }
+
+        function clearHistory() {
+            if (confirm("Bạn có chắc muốn xóa toàn bộ lịch sử chấm bài đã lưu trên trình duyệt?")) {
+                gradingHistory = [];
+                saveHistory();
+                showToast("Đã xóa sạch lịch sử.", "info");
+            }
+        }
+
+        // Sync Queue (Offline Management)
+        function loadSyncQueue() {
+            const savedQueue = localStorage.getItem("mini_grading_sync_queue");
+            if (savedQueue) {
+                try {
+                    syncQueue = JSON.parse(savedQueue);
+                } catch (e) {
+                    console.error("Lỗi đọc hàng đợi:", e);
+                }
+            }
+            renderSyncQueue();
+        }
+
+        function saveSyncQueue() {
+            localStorage.setItem("mini_grading_sync_queue", JSON.stringify(syncQueue));
+            renderSyncQueue();
+        }
+
+        function addToSyncQueue(item) {
+            if (!syncQueue.some(q => q.id === item.id)) {
+                syncQueue.push(item);
+                saveSyncQueue();
+            }
+        }
+
+        function removeFromSyncQueue(id) {
+            syncQueue = syncQueue.filter(q => q.id !== id);
+            saveSyncQueue();
+        }
+
+        // Rendering Methods
+        function initDaySelect() {
+            const daySelect = document.getElementById("daySelect");
+            const currentValue = daySelect.value;
+            daySelect.innerHTML = "";
+            
+            for (let i = 1; i <= 28; i++) {
+                const option = document.createElement("option");
+                option.value = i;
+                option.textContent = `Ngày ${i}: ${appConfig.daysData[i].title}`;
+                daySelect.appendChild(option);
+            }
+            
+            if (currentValue && currentValue <= 28) {
+                daySelect.value = currentValue;
+            }
+        }
+
+        function updateDayPromptPreview() {
+            const day = document.getElementById("daySelect").value;
+            const data = appConfig.daysData[day];
+            
+            const previewEl = document.getElementById("dayPromptPreview");
+            const titleEl = document.getElementById("dayPromptTitle");
+            const textEl = document.getElementById("dayPromptText");
+            
+            if (data) {
+                previewEl.style.display = "block";
+                titleEl.textContent = `Ngày ${day}: ${data.title}`;
+                textEl.textContent = data.question || "(Không có câu hỏi phản tư định hướng)";
+            } else {
+                previewEl.style.display = "none";
+            }
+        }
+
+        function renderDaysSettingsTable() {
+            const tbody = document.getElementById("daysSettingsTableBody");
+            tbody.innerHTML = "";
+            
+            for (let i = 1; i <= 28; i++) {
+                const day = appConfig.daysData[i] || { title: "", question: "" };
+                const row = document.createElement("tr");
+                row.innerHTML = `
+                    <td style="font-weight: 600; text-align: center;">${i}</td>
+                    <td>
+                        <input type="text" id="day-title-${i}" value="${escapeHtml(day.title)}" required>
+                    </td>
+                    <td>
+                        <textarea id="day-question-${i}" style="min-height: 80px; font-size: 0.85rem; line-height: 1.4; resize: vertical;">${escapeHtml(day.question)}</textarea>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            }
+        }
+
+        function renderSkillsSettingsTable() {
+            const tbody = document.getElementById("skillsSettingsTableBody");
+            tbody.innerHTML = "";
+            
+            appConfig.aiSkills.forEach(skill => {
+                const row = document.createElement("tr");
+                row.innerHTML = `
+                    <td>
+                        <input type="text" id="skill-name-${skill.id}" value="${escapeHtml(skill.name)}" required style="font-weight:600;">
+                    </td>
+                    <td>
+                        <input type="text" id="skill-desc-${skill.id}" value="${escapeHtml(skill.description)}">
+                    </td>
+                    <td>
+                        <textarea id="skill-inst-${skill.id}" style="min-height: 100px; font-family: monospace; font-size: 0.8rem; line-height: 1.4; resize: vertical;">${escapeHtml(skill.instruction)}</textarea>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        function renderMainSkillsCheckboxes() {
+            const container = document.getElementById("skillsCheckboxContainer");
+            container.innerHTML = "";
+            
+            appConfig.aiSkills.forEach(skill => {
+                const card = document.createElement("label");
+                card.className = "skill-card";
+                card.innerHTML = `
+                    <input type="checkbox" name="activeSkills" value="${skill.id}" checked>
+                    <div class="skill-card-info">
+                        <h5>${escapeHtml(skill.name)}</h5>
+                        <p>${escapeHtml(skill.description)}</p>
+                    </div>
+                `;
+                
+                const checkbox = card.querySelector('input[type="checkbox"]');
+                card.addEventListener("click", (e) => {
+                    if (e.target !== checkbox) {
+                        e.preventDefault();
+                        checkbox.checked = !checkbox.checked;
+                    }
+                });
+                
+                container.appendChild(card);
+            });
+        }
+
+        function renderHistoryTable() {
+            const tbody = document.getElementById("historyList");
+            tbody.innerHTML = "";
+            
+            if (gradingHistory.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="empty-log">Chưa chấm bài viết nào.</td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            gradingHistory.forEach((item, index) => {
+                const tr = document.createElement("tr");
+                const date = new Date(item.timestamp);
+                const timeStr = `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')} ${date.getDate()}/${date.getMonth()+1}`;
+                
+                const statusBadge = item.sheetSyncFailed 
+                    ? `<span class="badge badge-warning"><i data-lucide="cloud-off" style="width: 12px; height: 12px;"></i> Lỗi Sheet</span>`
+                    : `<span class="badge badge-success"><i data-lucide="cloud" style="width: 12px; height: 12px;"></i> Đã lưu</span>`;
+                
+                tr.innerHTML = `
+                    <td>${timeStr}</td>
+                    <td>${escapeHtml(item.studentId) || '-'}</td>
+                    <td style="font-weight: 500;">${escapeHtml(item.studentName)}</td>
+                    <td>Ngày ${item.day}</td>
+                    <td>${statusBadge}</td>
+                    <td class="actions-cell">
+                        <button class="btn btn-secondary btn-icon" onclick="viewHistoryItem(${index}); event.stopPropagation();" title="Xem lại">
+                            <i data-lucide="eye" style="width: 14px; height: 14px;"></i>
+                        </button>
+                        <button class="btn btn-secondary btn-icon" onclick="copyHistoryReview(${index}); event.stopPropagation();" title="Copy nhận xét">
+                            <i data-lucide="copy" style="width: 14px; height: 14px;"></i>
+                        </button>
+                        <button class="btn btn-secondary btn-icon" style="color: var(--danger);" onclick="deleteHistoryItem(${index}); event.stopPropagation();" title="Xóa">
+                            <i data-lucide="trash" style="width: 14px; height: 14px;"></i>
+                        </button>
+                    </td>
+                `;
+                tr.addEventListener("click", () => viewHistoryItem(index));
+                tbody.appendChild(tr);
+            });
+            lucide.createIcons();
+        }
+
+        function renderSyncQueue() {
+            const list = document.getElementById("queueList");
+            const btnAll = document.getElementById("retryAllSyncBtn");
+            list.innerHTML = "";
+            
+            if (syncQueue.length === 0) {
+                list.innerHTML = `<div class="empty-log" style="padding: 1.5rem 1rem;">Không có bài lỗi. Tất cả dữ liệu đã sạch!</div>`;
+                btnAll.style.display = "none";
+                return;
+            }
+            
+            btnAll.style.display = "block";
+            
+            syncQueue.forEach(item => {
+                const date = new Date(item.timestamp);
+                const timeStr = `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+                
+                const card = document.createElement("div");
+                card.className = "queue-item";
+                card.innerHTML = `
+                    <div class="queue-item-info">
+                        <h5>${escapeHtml(item.studentName)} (Ngày ${item.day})</h5>
+                        <p>${timeStr} | Lỗi: ${escapeHtml(item.errorMsg || 'Không kết nối được')}</p>
+                    </div>
+                    <button class="btn btn-secondary btn-icon" onclick="syncSingleQueueItem('${item.id}'); event.stopPropagation();" title="Đồng bộ lại">
+                        <i data-lucide="refresh-cw" style="width: 14px; height: 14px;"></i>
+                    </button>
+                `;
+                list.appendChild(card);
+            });
+            lucide.createIcons();
+        }
+
+        // --- DOCX File parsing and Autofill Logic ---
+        function handleDocxFile(file) {
+            showToast("Đang đọc file docx...", "info");
+            
+            const reader = new FileReader();
+            reader.onload = function(loadEvent) {
+                const arrayBuffer = loadEvent.target.result;
+                
+                mammoth.extractRawText({ arrayBuffer: arrayBuffer })
+                    .then(function(resultValue) {
+                        const text = resultValue.value; // The raw text extracted
+                        
+                        // 1. Parse from filename
+                        const filenameData = parseFromFilename(file.name);
+                        
+                        // 2. Parse from content text
+                        const contentData = parseFromContent(text);
+                        
+                        // Merge parsed results (Content text takes priority, filename acts as fallback)
+                        const studentName = contentData.studentName || filenameData.studentName;
+                        const studentId = contentData.studentId || filenameData.studentId;
+                        const day = contentData.day || filenameData.day;
+                        
+                        // Populate inputs
+                        if (studentName) {
+                            document.getElementById("studentName").value = studentName;
+                        }
+                        if (studentId) {
+                            document.getElementById("studentId").value = studentId;
+                        }
+                        if (day && day >= 1 && day <= 28) {
+                            document.getElementById("daySelect").value = day;
+                            updateDayPromptPreview();
+                        }
+                        
+                        // Fill main text area with full text content (including questions)
+                        // Gemma will handle splitting the questions from the answers
+                        document.getElementById("essayContent").value = text;
+                        updateTextCounts();
+                        
+                        let msg = "Đã đọc xong file docx! ";
+                        if (studentName || day) {
+                            msg += `Tự động nhận diện: ${studentName || 'Chưa rõ tên'} ${day ? `(Ngày ${day})` : ''}`;
+                        } else {
+                            msg += "Không tìm thấy thông tin học viên trong file/tên file, vui lòng nhập tay.";
+                        }
+                        
+                        showToast(msg, "success");
+                    })
+                    .catch(function(err) {
+                        console.error("Lỗi đọc file docx:", err);
+                        showToast("Không thể đọc được file docx: " + err.message, "error");
+                    });
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // Filename parser
+        function parseFromFilename(filename) {
+            let result = { studentName: "", studentId: "", day: "" };
+            
+            // Clean up name: remove extension, replace underscores/dashes with spaces
+            let nameWithoutExt = filename.replace(/\.docx$/i, "").replace(/[-_]/g, " ").trim();
+            
+            // 1. Detect Day (e.g. "Ngay 5", "Ngay05", "Day 5", "N5", "Ngay_5")
+            let dayRegex = /(?:ngay|day|n|ngày)\s*(\d+)/i;
+            let dayMatch = nameWithoutExt.match(dayRegex);
+            if (dayMatch) {
+                result.day = parseInt(dayMatch[1]);
+                nameWithoutExt = nameWithoutExt.replace(dayMatch[0], "");
+            }
+            
+            // 2. Detect Student ID (e.g. "HV001", "HV 001", "MS123")
+            let idRegex = /(?:hv|ms|hv\s|ms\s)\s*(\d+)/i;
+            let idMatch = nameWithoutExt.match(idRegex);
+            if (idMatch) {
+                result.studentId = idMatch[0].trim().replace(/\s+/g, "");
+                nameWithoutExt = nameWithoutExt.replace(idMatch[0], "");
+            } else {
+                // Check if starting with sequence of uppercase letters and digits (e.g. HV123_Nguyen...)
+                let startIdRegex = /^([A-Z]+\d+)\b/i;
+                let startIdMatch = nameWithoutExt.match(startIdRegex);
+                if (startIdMatch) {
+                    result.studentId = startIdMatch[1].trim();
+                    nameWithoutExt = nameWithoutExt.replace(startIdMatch[0], "");
+                }
+            }
+            
+            // 3. The rest is assumed to be Student Name
+            let remaining = nameWithoutExt.replace(/\s+/g, " ").trim();
+            if (remaining.length > 2) {
+                result.studentName = remaining;
+            }
+            
+            return result;
+        }
+
+        // Body text scanner
+        function parseFromContent(text) {
+            let result = { studentName: "", studentId: "", day: "" };
+            
+            // Split by lines
+            let lines = text.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+            
+            // Scan first 15 lines for key-value pairs
+            let scanLimit = Math.min(lines.length, 15);
+            for (let i = 0; i < scanLimit; i++) {
+                let line = lines[i];
+                
+                // Name check (e.g. "Họ và tên: Nguyễn Văn A", "Tên học viên: Nguyễn Văn A", "Học viên: Nguyễn Văn A")
+                let nameMatch = line.match(/(?:ho\s*va\s*ten|ho\s*ten|họ\s*và\s*tên|họ\s*tên|ten\s*hoc\s*vien|tên\s*học\s*viên|hoc\s*vien|học\s*viên)\s*[:\-]\s*(.*)/i);
+                if (nameMatch && nameMatch[1].trim().length > 2) {
+                    result.studentName = nameMatch[1].trim();
+                }
+                
+                // ID check (e.g. "Mã học viên: HV001", "Mã số: HV001", "Mã HV: HV001", "Mã số học viên: HV001")
+                let idMatch = line.match(/(?:ma\s*hoc\s*vien|mã\s*học\s*viên|ma\s*hv|mã\s*hv|ma\s*so|mã\s*số)\s*[:\-]\s*(.*)/i);
+                if (idMatch && idMatch[1].trim().length > 1) {
+                    result.studentId = idMatch[1].trim().replace(/\s+/g, "");
+                }
+                
+                // Day check (e.g. "Ngày: 5", "Ngày học: 5", "Bài tập ngày: 5")
+                let dayMatch = line.match(/(?:ngay\s*hoc|ngày\s*học|ngay|ngày|ngay\s*thu|ngày\s*thứ)\s*[:\-]\s*(\d+)/i);
+                if (dayMatch) {
+                    result.day = parseInt(dayMatch[1]);
+                }
+            }
+            
+            return result;
+        }
+
+        // Logic Actions: Chấm bài
+        async function runGrading() {
+            if (!appConfig.apiKey || !appConfig.appsScriptUrl) {
+                showToast("Vui lòng thiết lập API Key và URL Apps Script trong phần Cấu hình trước!", "error");
+                openModal();
+                return;
+            }
+
+            const studentId = document.getElementById("studentId").value.trim();
+            const studentName = document.getElementById("studentName").value.trim();
+            const day = document.getElementById("daySelect").value;
+            const essay = document.getElementById("essayContent").value.trim();
+            
+            if (!studentName || !essay) {
+                showToast("Vui lòng điền đầy đủ Tên học viên và Bài làm!", "error");
+                return;
+            }
+
+            setEditMode(false);
+
+            // Collect active skills and compile system prompt
+            const checkedCheckboxes = document.querySelectorAll('input[name="activeSkills"]:checked');
+            if (checkedCheckboxes.length === 0) {
+                showToast("Vui lòng kích hoạt ít nhất một kỹ năng AI để chấm bài!", "warning");
+                return;
+            }
+            
+            let compiledSystemPrompt = appConfig.systemPrompt + "\n\nKHI CHẤM BÀI, BẮT BUỘC ÁP DỤNG CÁC KỸ NĂNG AI DƯỚI ĐÂY DỰA TRÊN LỰA CHỌN CỦA GIẢNG VIÊN:\n";
+            checkedCheckboxes.forEach(cb => {
+                const skill = appConfig.aiSkills.find(s => s.id === cb.value);
+                if (skill) {
+                    compiledSystemPrompt += `\n--- KỸ NĂNG: ${skill.name} ---\n${skill.instruction}\n`;
+                }
+            });
+
+            document.getElementById("resultEmpty").style.display = "none";
+            document.getElementById("resultContent").style.display = "none";
+            document.getElementById("resultLoading").style.display = "flex";
+            document.getElementById("submitGradingBtn").disabled = true;
+
+            const dayData = appConfig.daysData[day] || { title: "", question: "" };
+            const payload = {
+                action: "grade_and_save",
+                apiKey: appConfig.apiKey,
+                studentId: studentId,
+                studentName: studentName,
+                day: day,
+                dayTitle: dayData.title,
+                promptQuestion: dayData.question,
+                essay: essay,
+                systemPrompt: compiledSystemPrompt
+            };
+
+            const gradingId = "grade_" + Date.now();
+
+            try {
+                const response = await fetch(appConfig.appsScriptUrl, {
+                    method: "POST",
+                    mode: "cors",
+                    headers: {
+                        "Content-Type": "text/plain;charset=utf-8"
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error("Lỗi HTTP: " + response.status);
+                }
+
+                const result = await response.json();
+                
+                if (!result.success) {
+                    throw new Error(result.error || "Gặp sự cố không xác định khi chấm.");
+                }
+
+                currentGradingResult = {
+                    id: gradingId,
+                    timestamp: Date.now(),
+                    studentId: studentId,
+                    studentName: studentName,
+                    day: day,
+                    dayTitle: dayData.title,
+                    essay: essay,
+                    aiReview: result.aiReview,
+                    sheetSyncFailed: result.sheetSyncFailed,
+                    sheetUrl: result.sheetUrl || "",
+                    sheetName: result.sheetName || ""
+                };
+
+                addToHistory(currentGradingResult);
+
+                if (result.sheetSyncFailed) {
+                    showToast("Chấm xong nhưng lưu Google Sheet bị lỗi! Bài đã được đưa vào hàng đợi.", "error");
+                    addToSyncQueue({
+                        id: gradingId,
+                        timestamp: Date.now(),
+                        studentName: studentName,
+                        day: day,
+                        dayTitle: dayData.title,
+                        essay: essay,
+                        aiReview: result.aiReview,
+                        errorMsg: result.sheetError || "Lỗi lưu Sheet"
+                    });
+                } else {
+                    showToast("Đã chấm bài và lưu vào Google Sheet thành công!", "success");
+                    confetti({
+                        particleCount: 80,
+                        spread: 60,
+                        origin: { y: 0.8 }
+                    });
+                }
+
+                displayGradingResult(currentGradingResult);
+
+            } catch (err) {
+                console.error("Grading error:", err);
+                showToast("Lỗi chấm bài: " + err.message, "error");
+                document.getElementById("resultLoading").style.display = "none";
+                document.getElementById("resultEmpty").style.display = "flex";
+            } finally {
+                document.getElementById("submitGradingBtn").disabled = false;
+            }
+        }
+
+        // Action: Cập nhật nhận xét đã sửa lên Google Sheet
+        async function updateReview() {
+            if (!currentGradingResult) return;
+            
+            const editedText = document.getElementById("aiReviewEditorTextarea").value.trim();
+            if (!editedText) {
+                showToast("Nhận xét không được để trống!", "error");
+                return;
+            }
+
+            const saveBtn = document.getElementById("saveEditBtn");
+            const cancelBtn = document.getElementById("cancelEditBtn");
+            saveBtn.disabled = true;
+            cancelBtn.disabled = true;
+            
+            showToast("Đang cập nhật thay đổi lên Google Sheet...", "info");
+
+            const payload = {
+                action: "update_review",
+                apiKey: appConfig.apiKey,
+                studentName: currentGradingResult.studentName,
+                day: currentGradingResult.day,
+                aiReview: editedText
+            };
+
+            try {
+                const response = await fetch(appConfig.appsScriptUrl, {
+                    method: "POST",
+                    mode: "cors",
+                    headers: {
+                        "Content-Type": "text/plain;charset=utf-8"
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error("Lỗi kết nối HTTP " + response.status);
+                }
+
+                const result = await response.json();
+                if (!result.success) {
+                    throw new Error(result.error || "Ghi lỗi");
+                }
+
+                currentGradingResult.aiReview = editedText;
+                currentGradingResult.sheetSyncFailed = false;
+                if (result.sheetUrl) {
+                    currentGradingResult.sheetUrl = result.sheetUrl;
+                    currentGradingResult.sheetName = result.sheetName;
+                }
+
+                const histIdx = gradingHistory.findIndex(h => h.id === currentGradingResult.id);
+                if (histIdx !== -1) {
+                    gradingHistory[histIdx].aiReview = editedText;
+                    gradingHistory[histIdx].sheetSyncFailed = false;
+                    saveHistory();
+                }
+
+                removeFromSyncQueue(currentGradingResult.id);
+
+                showToast("Đã cập nhật nhận xét thành công!", "success");
+                setEditMode(false);
+                displayGradingResult(currentGradingResult);
+                
+                confetti({
+                    particleCount: 50,
+                    spread: 40,
+                    origin: { y: 0.8 }
+                });
+
+            } catch (err) {
+                console.error("Update review error:", err);
+                showToast("Lỗi cập nhật Sheet: " + err.message + ". Đã lưu tạm nhận xét mới vào Lịch sử duyệt local.", "warning");
+                
+                currentGradingResult.aiReview = editedText;
+                currentGradingResult.sheetSyncFailed = true;
+                
+                const histIdx = gradingHistory.findIndex(h => h.id === currentGradingResult.id);
+                if (histIdx !== -1) {
+                    gradingHistory[histIdx].aiReview = editedText;
+                    gradingHistory[histIdx].sheetSyncFailed = true;
+                    saveHistory();
+                }
+                
+                addToSyncQueue({
+                    id: currentGradingResult.id,
+                    timestamp: currentGradingResult.timestamp,
+                    studentName: currentGradingResult.studentName,
+                    day: currentGradingResult.day,
+                    dayTitle: currentGradingResult.dayTitle,
+                    essay: currentGradingResult.essay,
+                    aiReview: editedText,
+                    errorMsg: "Lỗi ghi đè Sheet: " + err.message
+                });
+
+                setEditMode(false);
+                displayGradingResult(currentGradingResult);
+            } finally {
+                saveBtn.disabled = false;
+                cancelBtn.disabled = false;
+            }
+        }
+
+        function displayGradingResult(item) {
+            document.getElementById("resultLoading").style.display = "none";
+            document.getElementById("resultEmpty").style.display = "none";
+            
+            const contentEl = document.getElementById("resultContent");
+            contentEl.style.display = "flex";
+            
+            const metaStr = `Học viên: <strong>${escapeHtml(item.studentName)}</strong> ${item.studentId ? `(${escapeHtml(item.studentId)})` : ''} | Ngày học: <strong>${item.day} (${escapeHtml(item.dayTitle)})</strong>`;
+            document.getElementById("resultMeta").innerHTML = metaStr;
+            
+            const badgeContainer = document.getElementById("resultSyncBadge");
+            if (item.sheetSyncFailed) {
+                badgeContainer.innerHTML = `<span class="badge badge-danger" title="Bấm vào Hàng đợi đồng bộ bên dưới để gửi lại"><i data-lucide="cloud-off" style="width: 12px; height: 12px;"></i> Lưu Sheet lỗi</span>`;
+            } else if (item.sheetUrl) {
+                badgeContainer.innerHTML = `<a href="${item.sheetUrl}" target="_blank" title="Mở bảng tính Google Sheet để xem dữ liệu" style="text-decoration: none;"><span class="badge badge-success"><i data-lucide="external-link" style="width: 12px; height: 12px;"></i> Xem Sheet</span></a>`;
+            } else {
+                badgeContainer.innerHTML = `<span class="badge badge-success"><i data-lucide="cloud-check" style="width: 12px; height: 12px;"></i> Đã lưu Sheet</span>`;
+            }
+            
+            const reviewHtml = marked.parse(item.aiReview);
+            document.getElementById("aiReviewOutput").innerHTML = reviewHtml;
+            
+            currentGradingResult = item;
+            lucide.createIcons();
+        }
+
+        async function runAiRewrite() {
+            if (!currentGradingResult) return;
+            
+            const feedbackText = document.getElementById("aiFeedbackInput").value.trim();
+            if (!feedbackText) {
+                showToast("Vui lòng nhập góp ý hoặc yêu cầu điều chỉnh của chị!", "warning");
+                return;
+            }
+            
+            const submitBtn = document.getElementById("submitAiFeedbackBtn");
+            const feedbackInput = document.getElementById("aiFeedbackInput");
+            const toggleBtn = document.getElementById("aiRewriteToggleBtn");
+            
+            submitBtn.disabled = true;
+            feedbackInput.disabled = true;
+            toggleBtn.disabled = true;
+            
+            document.getElementById("resultLoading").style.display = "flex";
+            document.getElementById("resultContent").style.display = "none";
+            
+            // Build the system prompt
+            const checkedCheckboxes = document.querySelectorAll('input[name="activeSkills"]:checked');
+            let compiledSystemPrompt = appConfig.systemPrompt + "\n\nKHI CHẤM BÀI, BẮT BUỘC ÁP DỤNG CÁC KỸ NĂNG AI DƯỚI ĐÂY DỰA TRÊN LỰA CHỌN CỦA GIẢNG VIÊN:\n";
+            checkedCheckboxes.forEach(cb => {
+                const skill = appConfig.aiSkills.find(s => s.id === cb.value);
+                if (skill) {
+                    compiledSystemPrompt += `\n--- KỸ NĂNG: ${skill.name} ---\n${skill.instruction}\n`;
+                }
+            });
+            
+            const dayData = appConfig.daysData[currentGradingResult.day] || { title: "", question: "" };
+            const payload = {
+                action: "rewrite_review",
+                apiKey: appConfig.apiKey,
+                studentId: currentGradingResult.studentId,
+                studentName: currentGradingResult.studentName,
+                day: currentGradingResult.day,
+                dayTitle: currentGradingResult.dayTitle,
+                promptQuestion: dayData.question,
+                essay: currentGradingResult.essay,
+                aiReview: currentGradingResult.aiReview, // previous review
+                feedback: feedbackText,
+                systemPrompt: compiledSystemPrompt
+            };
+            
+            try {
+                const response = await fetch(appConfig.appsScriptUrl, {
+                    method: "POST",
+                    mode: "cors",
+                    headers: {
+                        "Content-Type": "text/plain;charset=utf-8"
+                    },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (!response.ok) {
+                    throw new Error("Lỗi HTTP: " + response.status);
+                }
+                
+                const result = await response.json();
+                if (!result.success) {
+                    throw new Error(result.error || "Gặp sự cố không xác định khi chấm.");
+                }
+                
+                currentGradingResult.aiReview = result.aiReview;
+                currentGradingResult.sheetSyncFailed = result.sheetSyncFailed;
+                currentGradingResult.sheetUrl = result.sheetUrl || currentGradingResult.sheetUrl;
+                currentGradingResult.sheetName = result.sheetName || currentGradingResult.sheetName;
+                
+                // Update history item
+                const histIdx = gradingHistory.findIndex(h => h.id === currentGradingResult.id);
+                if (histIdx !== -1) {
+                    gradingHistory[histIdx].aiReview = result.aiReview;
+                    gradingHistory[histIdx].sheetSyncFailed = result.sheetSyncFailed;
+                    if (result.sheetUrl) {
+                        gradingHistory[histIdx].sheetUrl = result.sheetUrl;
+                        gradingHistory[histIdx].sheetName = result.sheetName;
+                    }
+                    saveHistory();
+                }
+                
+                removeFromSyncQueue(currentGradingResult.id);
+                
+                if (result.sheetSyncFailed) {
+                    showToast("Viết lại xong nhưng lưu Google Sheet bị lỗi! Bài đã được đưa vào hàng đợi.", "error");
+                    addToSyncQueue({
+                        id: currentGradingResult.id,
+                        timestamp: currentGradingResult.timestamp,
+                        studentName: currentGradingResult.studentName,
+                        day: currentGradingResult.day,
+                        dayTitle: currentGradingResult.dayTitle,
+                        essay: currentGradingResult.essay,
+                        aiReview: result.aiReview,
+                        errorMsg: result.sheetError || "Lỗi lưu Sheet"
+                    });
+                } else {
+                    showToast("AI đã viết lại nhận xét và cập nhật Google Sheet thành công!", "success");
+                    confetti({
+                        particleCount: 50,
+                        spread: 40,
+                        origin: { y: 0.8 }
+                    });
+                }
+                
+                // Reset feedback input
+                feedbackInput.value = "";
+                document.getElementById("aiFeedbackPanel").style.display = "none";
+                
+            } catch (err) {
+                console.error("AI rewrite error:", err);
+                showToast("Lỗi viết lại nhận xét: " + err.message, "error");
+            } finally {
+                submitBtn.disabled = false;
+                feedbackInput.disabled = false;
+                toggleBtn.disabled = false;
+                displayGradingResult(currentGradingResult);
+            }
+        }
+
+        function setEditMode(active) {
+            isEditMode = active;
+            
+            const outputEl = document.getElementById("aiReviewOutput");
+            const textareaEl = document.getElementById("aiReviewEditorTextarea");
+            
+            const editBtn = document.getElementById("editResultBtn");
+            const copyBtn = document.getElementById("copyResultBtn");
+            const saveBtn = document.getElementById("saveEditBtn");
+            const cancelBtn = document.getElementById("cancelEditBtn");
+            const rewriteToggleBtn = document.getElementById("aiRewriteToggleBtn");
+            const feedbackPanel = document.getElementById("aiFeedbackPanel");
+            
+            if (active) {
+                outputEl.style.display = "none";
+                textareaEl.style.display = "block";
+                textareaEl.value = currentGradingResult ? currentGradingResult.aiReview : "";
+                
+                editBtn.style.display = "none";
+                copyBtn.style.display = "none";
+                saveBtn.style.display = "inline-flex";
+                cancelBtn.style.display = "inline-flex";
+                rewriteToggleBtn.style.display = "none";
+                feedbackPanel.style.display = "none";
+            } else {
+                outputEl.style.display = "block";
+                textareaEl.style.display = "none";
+                
+                editBtn.style.display = "inline-flex";
+                copyBtn.style.display = "inline-flex";
+                saveBtn.style.display = "none";
+                cancelBtn.style.display = "none";
+                rewriteToggleBtn.style.display = "inline-flex";
+            }
+        }
+
+        function viewHistoryItem(index) {
+            const item = gradingHistory[index];
+            if (item) {
+                setEditMode(false);
+                displayGradingResult(item);
+                
+                document.getElementById("studentId").value = item.studentId;
+                document.getElementById("studentName").value = item.studentName;
+                document.getElementById("daySelect").value = item.day;
+                document.getElementById("essayContent").value = item.essay;
+                updateDayPromptPreview();
+                updateTextCounts();
+                showToast("Đã tải bài chấm của " + item.studentName + " lên màn hình.", "info");
+            }
+        }
+
+        function copyHistoryReview(index) {
+            const item = gradingHistory[index];
+            if (item) {
+                copyTextToClipboard(item.aiReview);
+            }
+        }
+
+        function deleteHistoryItem(index) {
+            if (confirm("Xóa bài chấm này khỏi lịch sử local? (Dữ liệu trên Google Sheet vẫn giữ nguyên)")) {
+                gradingHistory.splice(index, 1);
+                saveHistory();
+                showToast("Đã xóa dòng lịch sử.", "info");
+            }
+        }
+
+        // Sync Queue Actions
+        async function syncSingleQueueItem(id) {
+            const item = syncQueue.find(q => q.id === id);
+            if (!item) return;
+            
+            showToast("Đang gửi lại dữ liệu của " + item.studentName + " lên Google Sheet...", "info");
+            
+            const payload = {
+                action: "save_only",
+                studentId: item.studentId,
+                studentName: item.studentName,
+                day: item.day,
+                dayTitle: item.dayTitle,
+                essay: item.essay,
+                aiReview: item.aiReview
+            };
+            
+            try {
+                const response = await fetch(appConfig.appsScriptUrl, {
+                    method: "POST",
+                    mode: "cors",
+                    headers: {
+                        "Content-Type": "text/plain;charset=utf-8"
+                    },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (!response.ok) {
+                    throw new Error("HTTP " + response.status);
+                }
+                
+                const result = await response.json();
+                if (!result.success) {
+                    throw new Error(result.error || "Ghi lỗi");
+                }
+                
+                removeFromSyncQueue(id);
+                
+                const historyItemIndex = gradingHistory.findIndex(h => h.id === id);
+                if (historyItemIndex !== -1) {
+                    gradingHistory[historyItemIndex].sheetSyncFailed = false;
+                    if (result.sheetUrl) {
+                        gradingHistory[historyItemIndex].sheetUrl = result.sheetUrl;
+                        gradingHistory[historyItemIndex].sheetName = result.sheetName;
+                    }
+                    saveHistory();
+                }
+                
+                if (currentGradingResult && currentGradingResult.id === id) {
+                    currentGradingResult.sheetSyncFailed = false;
+                    if (result.sheetUrl) {
+                        currentGradingResult.sheetUrl = result.sheetUrl;
+                        currentGradingResult.sheetName = result.sheetName;
+                    }
+                    displayGradingResult(currentGradingResult);
+                }
+                
+                showToast("Đồng bộ thành công học viên: " + item.studentName, "success");
+            } catch (err) {
+                console.error("Re-sync error:", err);
+                showToast("Đồng bộ lỗi: " + err.message, "error");
+            }
+        }
+
+        async function syncAllQueue() {
+            if (syncQueue.length === 0) return;
+            const itemsToSync = [...syncQueue];
+            
+            for (let item of itemsToSync) {
+                await syncSingleQueueItem(item.id);
+            }
+        }
+
+        // Theme management
+        function initTheme() {
+            const savedTheme = localStorage.getItem("mini_grading_theme") || "dark";
+            document.documentElement.setAttribute("data-theme", savedTheme);
+            updateThemeIcon(savedTheme);
+        }
+
+        function toggleTheme() {
+            const currentTheme = document.documentElement.getAttribute("data-theme");
+            const newTheme = currentTheme === "dark" ? "light" : "dark";
+            
+            document.documentElement.setAttribute("data-theme", newTheme);
+            localStorage.setItem("mini_grading_theme", newTheme);
+            updateThemeIcon(newTheme);
+            showToast(`Đã chuyển sang giao diện ${newTheme === 'dark' ? 'Tối' : 'Sáng'}`, "info");
+        }
+
+        function updateThemeIcon(theme) {
+            const btn = document.getElementById("themeToggleBtn");
+            if (theme === "dark") {
+                btn.innerHTML = `<i data-lucide="sun"></i>`;
+            } else {
+                btn.innerHTML = `<i data-lucide="moon"></i>`;
+            }
+            lucide.createIcons();
+        }
+
+        // Settings Modal Tab switching
+        function initSettingsTabs() {
+            const tabButtons = document.querySelectorAll(".settings-tab-btn");
+            const tabContents = document.querySelectorAll(".settings-tab-content");
+            
+            tabButtons.forEach(btn => {
+                btn.addEventListener("click", () => {
+                    const target = btn.getAttribute("data-target");
+                    
+                    tabButtons.forEach(b => b.classList.remove("active"));
+                    tabContents.forEach(c => c.classList.remove("active"));
+                    
+                    btn.classList.add("active");
+                    document.getElementById(target).classList.add("active");
+                });
+            });
+        }
+
+        // UI Event Handlers
+        function registerEventListeners() {
+            // Theme toggle
+            document.getElementById("themeToggleBtn").addEventListener("click", toggleTheme);
+            
+            // Settings modal open/close
+            document.getElementById("settingsBtn").addEventListener("click", openModal);
+            document.getElementById("closeSettingsBtn").addEventListener("click", closeModal);
+            document.getElementById("saveSettingsBtn").addEventListener("click", saveConfig);
+            document.getElementById("resetDefaultsBtn").addEventListener("click", resetConfigToDefaults);
+            
+            const modal = document.getElementById("settingsModal");
+            modal.addEventListener("click", (e) => {
+                if (e.target === modal) closeModal();
+            });
+
+            // Settings tab switching
+            initSettingsTabs();
+
+            // Form Submit
+            document.getElementById("gradingForm").addEventListener("submit", runGrading);
+
+            // Day Select Change
+            document.getElementById("daySelect").addEventListener("change", updateDayPromptPreview);
+
+            // Character/Word count updating
+            const essayTextarea = document.getElementById("essayContent");
+            essayTextarea.addEventListener("input", updateTextCounts);
+
+            // Copy Action
+            document.getElementById("copyResultBtn").addEventListener("click", () => {
+                if (currentGradingResult && currentGradingResult.aiReview) {
+                    copyTextToClipboard(currentGradingResult.aiReview);
+                }
+            });
+
+            // AI Rewrite Actions
+            document.getElementById("aiRewriteToggleBtn").addEventListener("click", () => {
+                const panel = document.getElementById("aiFeedbackPanel");
+                if (panel.style.display === "none") {
+                    panel.style.display = "block";
+                    document.getElementById("aiFeedbackInput").focus();
+                } else {
+                    panel.style.display = "none";
+                }
+            });
+            document.getElementById("submitAiFeedbackBtn").addEventListener("click", runAiRewrite);
+            document.getElementById("aiFeedbackInput").addEventListener("keypress", (e) => {
+                if (e.key === "Enter") {
+                    runAiRewrite();
+                }
+            });
+
+            // Edit Actions
+            document.getElementById("editResultBtn").addEventListener("click", () => setEditMode(true));
+            document.getElementById("cancelEditBtn").addEventListener("click", () => setEditMode(false));
+            document.getElementById("saveEditBtn").addEventListener("click", updateReview);
+
+            // Clipboard Paste Helper
+            document.getElementById("pasteBtn").addEventListener("click", handleClipboardPaste);
+
+            // Clear history log
+            document.getElementById("clearHistoryBtn").addEventListener("click", clearHistory);
+
+            // Sync Queue actions
+            document.getElementById("retryAllSyncBtn").addEventListener("click", syncAllQueue);
+
+            // DOCX File Upload listeners
+            const dropzone = document.getElementById("dropzone");
+            const fileInput = document.getElementById("docxFileInput");
+
+            dropzone.addEventListener("click", () => fileInput.click());
+            
+            fileInput.addEventListener("change", (e) => {
+                if (e.target.files.length > 0) {
+                    handleDocxFile(e.target.files[0]);
+                }
+            });
+
+            // Drag over effects
+            dropzone.addEventListener("dragover", (e) => {
+                e.preventDefault();
+                dropzone.classList.add("dragover");
+            });
+
+            ["dragleave", "dragend"].forEach(type => {
+                dropzone.addEventListener(type, () => {
+                    dropzone.classList.remove("dragover");
+                });
+            });
+
+            dropzone.addEventListener("drop", (e) => {
+                e.preventDefault();
+                dropzone.classList.remove("dragover");
+                if (e.dataTransfer.files.length > 0) {
+                    const file = e.dataTransfer.files[0];
+                    if (file.name.endsWith(".docx")) {
+                        handleDocxFile(file);
+                    } else {
+                        showToast("Vui lòng tải lên file định dạng .docx", "warning");
+                    }
+                }
+            });
+        }
+
+        function openModal() {
+            const tabButtons = document.querySelectorAll(".settings-tab-btn");
+            const tabContents = document.querySelectorAll(".settings-tab-content");
+            tabButtons.forEach((b, i) => {
+                if (i === 0) b.classList.add("active");
+                else b.classList.remove("active");
+            });
+            tabContents.forEach((c, i) => {
+                if (i === 0) c.classList.add("active");
+                else c.classList.remove("active");
+            });
+
+            document.getElementById("settingsModal").style.display = "flex";
+            renderDaysSettingsTable();
+            renderSkillsSettingsTable();
+        }
+
+        function closeModal() {
+            document.getElementById("settingsModal").style.display = "none";
+        }
+
+        function updateTextCounts() {
+            const text = document.getElementById("essayContent").value;
+            const charCount = text.length;
+            const cleanText = text.trim();
+            const wordCount = cleanText === "" ? 0 : cleanText.split(/\s+/).length;
+            
+            document.getElementById("charCount").textContent = `${charCount} ký tự`;
+            document.getElementById("wordCount").textContent = `${wordCount} từ`;
+        }
+
+        async function handleClipboardPaste() {
+            try {
+                const text = await navigator.clipboard.readText();
+                if (text) {
+                    const essayTextarea = document.getElementById("essayContent");
+                    essayTextarea.value = text;
+                    updateTextCounts();
+                    showToast("Đã dán bài viết từ clipboard!", "info");
+                }
+            } catch (err) {
+                showToast("Không thể tự động đọc clipboard. Hãy nhấn Ctrl+V để dán trực tiếp.", "warning");
+            }
+        }
+
+        function copyTextToClipboard(text) {
+            if (!text) return;
+            navigator.clipboard.writeText(text).then(() => {
+                showToast("Đã sao chép nhận xét vào clipboard!", "success");
+            }).catch(err => {
+                showToast("Lỗi sao chép clipboard.", "error");
+            });
+        }
+
+        function showToast(message, type = "info") {
+            const toast = document.getElementById("toast");
+            const icon = document.getElementById("toastIcon");
+            const msgSpan = document.getElementById("toastMessage");
+
+            msgSpan.textContent = message;
+            toast.className = `toast show toast-${type}`;
+            
+            let iconName = "info";
+            if (type === "success") iconName = "check-circle-2";
+            if (type === "error") iconName = "alert-circle";
+            if (type === "warning") iconName = "alert-triangle";
+            
+            icon.setAttribute("data-lucide", iconName);
+            lucide.createIcons();
+
+            if (window.toastTimeout) {
+                clearTimeout(window.toastTimeout);
+            }
+
+            window.toastTimeout = setTimeout(() => {
+                toast.classList.remove("show");
+            }, 3500);
+        }
+
+        function escapeHtml(unsafe) {
+            if (!unsafe) return "";
+            return unsafe
+                 .replace(/&/g, "&amp;")
+                 .replace(/</g, "&lt;")
+                 .replace(/>/g, "&gt;")
+                 .replace(/"/g, "&quot;")
+                 .replace(/'/g, "&#039;");
+        }
+    </script>
+</body>
+</html>
