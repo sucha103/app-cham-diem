@@ -304,9 +304,34 @@ function callGemmaAPI(apiKey, day, dayTitle, promptQuestion, essay, clientSystem
   }
 
   const result = JSON.parse(responseText);
-  
-  // DEBUGGING: Log raw response to Sheet to check what the API returned
-  return "RAW_API_RESPONSE: " + responseText;
+  if (!result.candidates || result.candidates.length === 0) {
+    throw new Error("Không nhận được candidates từ AI model.");
+  }
+
+  const candidate = result.candidates[0];
+  if (candidate.finishReason && candidate.finishReason !== "STOP" && candidate.finishReason !== "MAX_TOKENS") {
+    let safetyInfo = "";
+    if (candidate.finishReason === "SAFETY") {
+      safetyInfo = " do bộ lọc an toàn (Safety Filter) kích hoạt khi chấm bài viết có cảm xúc nhạy cảm.";
+    }
+    throw new Error("AI không thể xuất nhận xét. Lý do dừng: " + candidate.finishReason + safetyInfo);
+  }
+
+  let reviewText = "";
+  if (candidate.content && candidate.content.parts) {
+    for (let i = 0; i < candidate.content.parts.length; i++) {
+      const part = candidate.content.parts[i];
+      if (part.text && !part.thought) {
+        reviewText += part.text;
+      }
+    }
+  }
+
+  if (reviewText.trim() === "") {
+    throw new Error("Không nhận được nội dung nhận xét từ AI model.");
+  }
+
+  return reviewText;
 }
 
 /**
