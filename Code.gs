@@ -260,7 +260,25 @@ function callGemmaAPI(apiKey, day, dayTitle, promptQuestion, essay, clientSystem
     generationConfig: {
       temperature: 0.3,
       maxOutputTokens: 2000
-    }
+    },
+    safetySettings: [
+      {
+        category: "HARM_CATEGORY_HARASSMENT",
+        threshold: "BLOCK_NONE"
+      },
+      {
+        category: "HARM_CATEGORY_HATE_SPEECH",
+        threshold: "BLOCK_NONE"
+      },
+      {
+        category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+        threshold: "BLOCK_NONE"
+      },
+      {
+        category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+        threshold: "BLOCK_NONE"
+      }
+    ]
   };
 
   const options = {
@@ -286,13 +304,24 @@ function callGemmaAPI(apiKey, day, dayTitle, promptQuestion, essay, clientSystem
   }
 
   const result = JSON.parse(responseText);
-  if (!result.candidates || result.candidates.length === 0 || 
-      !result.candidates[0].content || !result.candidates[0].content.parts || 
-      result.candidates[0].content.parts.length === 0) {
+  if (!result.candidates || result.candidates.length === 0) {
+    throw new Error("Không nhận được candidates từ AI model.");
+  }
+
+  const candidate = result.candidates[0];
+  if (candidate.finishReason && candidate.finishReason !== "STOP" && candidate.finishReason !== "MAX_TOKENS") {
+    let safetyInfo = "";
+    if (candidate.finishReason === "SAFETY") {
+      safetyInfo = " do bộ lọc an toàn (Safety Filter) kích hoạt khi chấm bài viết có cảm xúc nhạy cảm.";
+    }
+    throw new Error("AI không thể xuất nhận xét. Lý do dừng: " + candidate.finishReason + safetyInfo);
+  }
+
+  if (!candidate.content || !candidate.content.parts || candidate.content.parts.length === 0) {
     throw new Error("Không nhận được nội dung nhận xét từ AI model.");
   }
 
-  return result.candidates[0].content.parts[0].text;
+  return candidate.content.parts[0].text;
 }
 
 /**
