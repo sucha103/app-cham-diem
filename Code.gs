@@ -231,7 +231,8 @@ function callGemmaAPI(apiKey, day, dayTitle, promptQuestion, essay, clientSystem
     // Điều chỉnh system prompt chuyên biệt cho chế độ viết lại theo góp ý
     systemInstruction = 
       "Nhiệm vụ của bạn bây giờ là ĐIỀU CHỈNH và VIẾT LẠI bản nhận xét cũ dựa trên YÊU CẦU ĐIỀU CHỈNH của giảng viên.\n" +
-      "Hãy sửa đổi bản nhận xét cũ sao cho đáp ứng chính xác và đầy đủ các góp ý này, đồng thời vẫn phải tuân thủ các quy tắc xưng hô và cấu trúc dưới đây:\n\n" +
+      "Hãy sửa đổi bản nhận xét cũ sao cho đáp ứng chính xác và đầy đủ các góp ý này.\n" +
+      "LƯU Ý QUAN TRỌNG: Nếu yêu cầu điều chỉnh của giảng viên có thay đổi về cách xưng hô (ví dụ: đổi thành 'tôi' - 'em/bạn'...), giọng điệu hoặc cấu trúc, hãy ƯU TIÊN thực hiện theo yêu cầu của giảng viên thay vì tuân theo các quy tắc mặc định dưới đây. Nếu giảng viên không có yêu cầu đặc biệt về xưng hô, bạn hãy tiếp tục giữ nguyên mặc định (chị - em).\n\n" +
       systemInstruction;
   }
 
