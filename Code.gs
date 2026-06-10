@@ -223,9 +223,17 @@ function callGemmaAPI(apiKey, day, dayTitle, promptQuestion, essay, clientSystem
     "- Học viên có thể dán cả tiêu đề/đề bài lẫn lộn vào bài làm, bạn hãy tự bóc tách và chỉ tập trung nhận xét phần bài làm thực tế của học viên.";
 
   // Sử dụng system instruction từ client nếu có, ngược lại dùng mặc định
-  const systemInstruction = (clientSystemPrompt && clientSystemPrompt.trim() !== "") 
+  let systemInstruction = (clientSystemPrompt && clientSystemPrompt.trim() !== "") 
     ? clientSystemPrompt 
     : defaultSystemInstruction;
+
+  if (previousReview && feedback) {
+    // Điều chỉnh system prompt chuyên biệt cho chế độ viết lại theo góp ý
+    systemInstruction = 
+      "Nhiệm vụ của bạn bây giờ là ĐIỀU CHỈNH và VIẾT LẠI bản nhận xét cũ dựa trên YÊU CẦU ĐIỀU CHỈNH của giảng viên.\n" +
+      "Hãy sửa đổi bản nhận xét cũ sao cho đáp ứng chính xác và đầy đủ các góp ý này, đồng thời vẫn phải tuân thủ các quy tắc xưng hô và cấu trúc dưới đây:\n\n" +
+      systemInstruction;
+  }
 
   // Tạo prompt gửi cho AI
   let promptText = "";
@@ -258,7 +266,7 @@ function callGemmaAPI(apiKey, day, dayTitle, promptQuestion, essay, clientSystem
       parts: [{ text: systemInstruction }]
     },
     generationConfig: {
-      temperature: 0.3,
+      temperature: (previousReview && feedback) ? 0.7 : 0.3,
       maxOutputTokens: 2000
     },
     safetySettings: [
