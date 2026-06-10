@@ -257,7 +257,7 @@ function callGemmaAPI(apiKey, day, dayTitle, promptQuestion, essay, clientSystem
     promptText += `\nBài làm của học viên:\n"""\n${essay}\n"""\n\n` +
                  `Nhận xét cũ của bạn dành cho bài viết này:\n"""\n${previousReview}\n"""\n\n` +
                  `Yêu cầu điều chỉnh/Góp ý từ giảng viên đối với nhận xét cũ của bạn:\n"${feedback}"\n\n` +
-                 `Hãy viết lại hoặc điều chỉnh nhận xét trên sao cho đáp ứng đúng và đầy đủ yêu cầu điều chỉnh của giáo viên, đồng thời vẫn giữ nguyên cấu trúc bắt buộc (Tổng quan, Phân tích, Lời khuyên) và phong cách xưng hô (chị - em).`;
+                 `Hãy viết lại hoặc điều chỉnh nhận xét trên sao cho đáp ứng đúng và đầy đủ yêu cầu điều chỉnh của giáo viên, đồng thời vẫn giữ nguyên cấu trúc bắt buộc (Tổng quan, Phân tích, Lời khuyên) và phong cách xưng hô (${tPronoun} - ${sPronoun}).`;
   } else {
     promptText = `Học viên phản tư về: Ngày học thứ ${day} - Chủ đề: ${dayTitle}\n`;
     if (promptQuestion && promptQuestion.trim() !== "") {

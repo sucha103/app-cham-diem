@@ -941,6 +941,69 @@
             overflow-x: hidden;
             max-width: 100vw;
         }
+
+        /* Pronoun Manager Styling */
+        .pronoun-manager-section {
+            margin-bottom: 1.25rem;
+            background: rgba(255, 255, 255, 0.01);
+            border-radius: 10px;
+            padding: 0.5rem 0;
+        }
+        .pronoun-pill {
+            padding: 0.35rem 0.7rem;
+            font-size: 0.75rem;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-glass);
+            border-radius: 6px;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-weight: 500;
+        }
+        .pronoun-pill:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-main);
+            border-color: var(--primary);
+        }
+        .pronoun-pill.active {
+            background: var(--primary);
+            color: var(--text-inverse);
+            border-color: var(--primary);
+            font-weight: 600;
+            box-shadow: 0 0 8px var(--primary-glow);
+        }
+        [data-theme="light"] .pronoun-pill.active {
+            color: #ffffff;
+        }
+        .pronoun-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8rem;
+            text-align: left;
+        }
+        .pronoun-table th {
+            padding: 0.5rem 0.4rem;
+            border-bottom: 1px solid var(--border-glass);
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+        .pronoun-table td {
+            padding: 0.5rem 0.4rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            color: var(--text-main);
+            vertical-align: middle;
+        }
+        .pronoun-table tr:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
+        .pronoun-table-container {
+            max-height: 180px;
+            overflow-y: auto;
+            margin-bottom: 0.75rem;
+            border: 1px solid var(--border-glass);
+            border-radius: 6px;
+            background: rgba(0, 0, 0, 0.1);
+        }
     </style>
 </head>
 <body>
@@ -1004,6 +1067,58 @@
                         <div class="form-group">
                             <label for="studentPronoun">Gọi học viên là</label>
                             <input type="text" id="studentPronoun" value="em" placeholder="Ví dụ: em, anh, chị, bạn, con...">
+                        </div>
+                    </div>
+
+                    <!-- Pronoun Presets Manager -->
+                    <div class="pronoun-manager-section">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600; display: flex; align-items: center; gap: 0.25rem;">
+                                <i data-lucide="users" style="width: 14px; height: 14px; color: var(--primary);"></i>
+                                Xưng hô nhanh (Click chọn)
+                            </span>
+                            <button type="button" class="btn btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; display: flex; align-items: center; gap: 0.25rem; height: auto;" id="togglePronounTableBtn">
+                                <i data-lucide="settings-2" style="width: 12px; height: 12px;"></i> Bảng tùy chỉnh
+                            </button>
+                        </div>
+                        
+                        <!-- Presets Quick Select Container -->
+                        <div id="quickPronounsContainer" style="display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.5rem;">
+                            <!-- Will be rendered dynamically by JS -->
+                        </div>
+                        
+                        <!-- Collapsible Custom Presets Panel -->
+                        <div id="pronounTablePanel" style="display: none; background: rgba(255, 255, 255, 0.02); border: 1px dashed var(--border-glass); border-radius: 8px; padding: 0.75rem; margin-bottom: 0.5rem;">
+                            <div class="pronoun-table-container">
+                                <table class="pronoun-table">
+                                    <thead>
+                                        <tr>
+                                            <th>AI xưng</th>
+                                            <th>Học viên</th>
+                                            <th>Mô tả</th>
+                                            <th style="text-align: right;">Thao tác</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="pronounTableBody">
+                                        <!-- Will be rendered dynamically by JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <!-- Add Row Form -->
+                            <div style="display: flex; flex-direction: column; gap: 0.5rem; border-top: 1px solid var(--border-glass); padding-top: 0.5rem;">
+                                <span style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted);">Thêm cách xưng hô mới:</span>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem;">
+                                    <input type="text" id="newTeacherPronoun" placeholder="AI xưng (Ví dụ: thầy)" style="padding: 0.4rem; font-size: 0.8rem; border-radius: 6px; height: auto;">
+                                    <input type="text" id="newStudentPronoun" placeholder="HV là (Ví dụ: con)" style="padding: 0.4rem; font-size: 0.8rem; border-radius: 6px; height: auto;">
+                                </div>
+                                <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 0.4rem;">
+                                    <input type="text" id="newPronounDesc" placeholder="Mô tả (Ví dụ: Thầy - Trò)" style="padding: 0.4rem; font-size: 0.8rem; border-radius: 6px; height: auto;">
+                                    <button type="button" class="btn btn-primary" style="padding: 0.4rem; font-size: 0.8rem; border-radius: 6px; height: auto; display: flex; align-items: center; justify-content: center; gap: 0.25rem;" id="addPronounPresetBtn">
+                                        <i data-lucide="plus" style="width: 12px; height: 12px;"></i> Thêm
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -1423,6 +1538,7 @@
             loadSyncQueue();
             initDaySelect();
             initTheme();
+            initPronounPresets();
             renderDaysSettingsTable();
             renderSkillsSettingsTable();
             renderMainSkillsCheckboxes();
@@ -1905,6 +2021,199 @@
             return result;
         }
 
+        // Pronoun Presets Config & Methods
+        const DEFAULT_PRONOUN_PRESETS = [
+            { teacher: "chị", student: "em", desc: "Mặc định (Chị - Em)" },
+            { teacher: "tôi", student: "bạn", desc: "Trang trọng (Tôi - Bạn)" },
+            { teacher: "tôi", student: "anh", desc: "HV nam lớn tuổi (Tôi - Anh)" },
+            { teacher: "tôi", student: "chị", desc: "HV nữ lớn tuổi (Tôi - Chị)" },
+            { teacher: "thầy", student: "em", desc: "Thầy - Em" },
+            { teacher: "cô", student: "em", desc: "Cô - Em" },
+            { teacher: "thầy", student: "con", desc: "Thầy - Con" },
+            { teacher: "cô", student: "con", desc: "Cô - Con" }
+        ];
+
+        let pronounPresets = [];
+
+        function initPronounPresets() {
+            const savedPresets = localStorage.getItem("mini_grading_pronoun_presets");
+            if (savedPresets) {
+                try {
+                    pronounPresets = JSON.parse(savedPresets);
+                } catch (e) {
+                    console.error("Lỗi đọc danh sách xưng hô:", e);
+                    pronounPresets = [...DEFAULT_PRONOUN_PRESETS];
+                }
+            } else {
+                pronounPresets = [...DEFAULT_PRONOUN_PRESETS];
+                savePronounPresets();
+            }
+            renderPronouns();
+            
+            // Listen for changes in the inputs to update the active styling of the pills
+            document.getElementById("teacherPronoun").addEventListener("input", updateActivePresetPill);
+            document.getElementById("studentPronoun").addEventListener("input", updateActivePresetPill);
+        }
+
+        function savePronounPresets() {
+            localStorage.setItem("mini_grading_pronoun_presets", JSON.stringify(pronounPresets));
+        }
+
+        function renderPronouns() {
+            renderQuickPronounPills();
+            renderPronounTable();
+            updateActivePresetPill();
+        }
+
+        function renderQuickPronounPills() {
+            const container = document.getElementById("quickPronounsContainer");
+            container.innerHTML = "";
+            
+            pronounPresets.forEach((preset, index) => {
+                const btn = document.createElement("button");
+                btn.type = "button";
+                btn.className = "pronoun-pill";
+                btn.textContent = `${preset.teacher} - ${preset.student}`;
+                btn.title = preset.desc || "";
+                btn.dataset.index = index;
+                btn.addEventListener("click", () => {
+                    applyPronounPreset(preset.teacher, preset.student);
+                });
+                container.appendChild(btn);
+            });
+        }
+
+        function renderPronounTable() {
+            const tbody = document.getElementById("pronounTableBody");
+            tbody.innerHTML = "";
+            
+            pronounPresets.forEach((preset, index) => {
+                const tr = document.createElement("tr");
+                
+                const tdTeacher = document.createElement("td");
+                tdTeacher.textContent = preset.teacher;
+                tr.appendChild(tdTeacher);
+                
+                const tdStudent = document.createElement("td");
+                tdStudent.textContent = preset.student;
+                tr.appendChild(tdStudent);
+                
+                const tdDesc = document.createElement("td");
+                tdDesc.textContent = preset.desc || "";
+                tr.appendChild(tdDesc);
+                
+                const tdActions = document.createElement("td");
+                tdActions.style.textAlign = "right";
+                tdActions.style.display = "flex";
+                tdActions.style.justifyContent = "flex-end";
+                tdActions.style.gap = "0.25rem";
+                
+                // Select Button
+                const selectBtn = document.createElement("button");
+                selectBtn.type = "button";
+                selectBtn.className = "btn btn-secondary";
+                selectBtn.style.padding = "0.2rem 0.4rem";
+                selectBtn.style.fontSize = "0.75rem";
+                selectBtn.style.height = "auto";
+                selectBtn.textContent = "Chọn";
+                selectBtn.addEventListener("click", () => {
+                    applyPronounPreset(preset.teacher, preset.student);
+                });
+                tdActions.appendChild(selectBtn);
+                
+                // Delete Button
+                const deleteBtn = document.createElement("button");
+                deleteBtn.type = "button";
+                deleteBtn.className = "btn btn-danger";
+                deleteBtn.style.padding = "0.2rem 0.4rem";
+                deleteBtn.style.fontSize = "0.75rem";
+                deleteBtn.style.height = "auto";
+                deleteBtn.style.background = "transparent";
+                deleteBtn.style.border = "none";
+                deleteBtn.style.color = "var(--danger)";
+                deleteBtn.innerHTML = `<i data-lucide="trash-2" style="width: 12px; height: 12px;"></i>`;
+                deleteBtn.addEventListener("click", () => {
+                    deletePronounPreset(index);
+                });
+                tdActions.appendChild(deleteBtn);
+                
+                tr.appendChild(tdActions);
+                tbody.appendChild(tr);
+            });
+            
+            // Re-create lucide icons for table
+            lucide.createIcons();
+        }
+
+        function applyPronounPreset(teacher, student) {
+            document.getElementById("teacherPronoun").value = teacher;
+            document.getElementById("studentPronoun").value = student;
+            updateActivePresetPill();
+            
+            // Trigger input events
+            document.getElementById("teacherPronoun").dispatchEvent(new Event('input'));
+            document.getElementById("studentPronoun").dispatchEvent(new Event('input'));
+        }
+
+        function updateActivePresetPill() {
+            const currentTeacher = document.getElementById("teacherPronoun").value.trim().toLowerCase();
+            const currentStudent = document.getElementById("studentPronoun").value.trim().toLowerCase();
+            
+            const pills = document.querySelectorAll("#quickPronounsContainer .pronoun-pill");
+            pills.forEach(pill => {
+                const idx = parseInt(pill.dataset.index);
+                const preset = pronounPresets[idx];
+                if (preset && preset.teacher.toLowerCase() === currentTeacher && preset.student.toLowerCase() === currentStudent) {
+                    pill.classList.add("active");
+                } else {
+                    pill.classList.remove("active");
+                }
+            });
+        }
+
+        function addPronounPreset() {
+            const teacher = document.getElementById("newTeacherPronoun").value.trim();
+            const student = document.getElementById("newStudentPronoun").value.trim();
+            const desc = document.getElementById("newPronounDesc").value.trim();
+            
+            if (!teacher || !student) {
+                alert("Vui lòng điền đầy đủ cả 'AI xưng là' và 'Gọi học viên là'!");
+                return;
+            }
+            
+            // Check if already exists
+            const exists = pronounPresets.some(p => p.teacher.toLowerCase() === teacher.toLowerCase() && p.student.toLowerCase() === student.toLowerCase());
+            if (exists) {
+                alert("Cặp xưng hô này đã tồn tại trong danh sách!");
+                return;
+            }
+            
+            pronounPresets.push({
+                teacher: teacher,
+                student: student,
+                desc: desc || `${teacher} - ${student}`
+            });
+            
+            savePronounPresets();
+            renderPronouns();
+            
+            // Clear inputs
+            document.getElementById("newTeacherPronoun").value = "";
+            document.getElementById("newStudentPronoun").value = "";
+            document.getElementById("newPronounDesc").value = "";
+            
+            // Auto-apply new preset
+            applyPronounPreset(teacher, student);
+        }
+
+        function deletePronounPreset(index) {
+            if (confirm("Bạn có chắc chắn muốn xóa cặp xưng hô này khỏi danh sách?")) {
+                pronounPresets.splice(index, 1);
+                savePronounPresets();
+                renderPronouns();
+            }
+        }
+
         // Logic Actions: Chấm bài
         async function runGrading() {
             if (!appConfig.apiKey || !appConfig.appsScriptUrl) {
@@ -2341,6 +2650,7 @@
                 document.getElementById("studentName").value = item.studentName;
                 document.getElementById("teacherPronoun").value = item.teacherPronoun || "chị";
                 document.getElementById("studentPronoun").value = item.studentPronoun || "em";
+                if (typeof updateActivePresetPill === 'function') updateActivePresetPill();
                 document.getElementById("daySelect").value = item.day;
                 document.getElementById("essayContent").value = item.essay;
                 updateDayPromptPreview();
@@ -2542,6 +2852,27 @@
 
             // Clipboard Paste Helper
             document.getElementById("pasteBtn").addEventListener("click", handleClipboardPaste);
+
+            // Pronoun Manager
+            document.getElementById("togglePronounTableBtn").addEventListener("click", () => {
+                const panel = document.getElementById("pronounTablePanel");
+                const btn = document.getElementById("togglePronounTableBtn");
+                if (panel.style.display === "none") {
+                    panel.style.display = "block";
+                    btn.innerHTML = `<i data-lucide="settings-2" style="width: 12px; height: 12px;"></i> Đóng bảng`;
+                } else {
+                    panel.style.display = "none";
+                    btn.innerHTML = `<i data-lucide="settings-2" style="width: 12px; height: 12px;"></i> Bảng tùy chỉnh`;
+                }
+                lucide.createIcons();
+            });
+
+            document.getElementById("addPronounPresetBtn").addEventListener("click", addPronounPreset);
+            document.getElementById("newPronounDesc").addEventListener("keypress", (e) => {
+                if (e.key === "Enter") {
+                    addPronounPreset();
+                }
+            });
 
             // Clear history log
             document.getElementById("clearHistoryBtn").addEventListener("click", clearHistory);
