@@ -995,6 +995,18 @@
                         </div>
                     </div>
 
+                    <!-- Pronouns configuration -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="teacherPronoun">AI xưng là (Giảng viên)</label>
+                            <input type="text" id="teacherPronoun" value="chị" placeholder="Ví dụ: chị, tôi, thầy, cô, mình...">
+                        </div>
+                        <div class="form-group">
+                            <label for="studentPronoun">Gọi học viên là</label>
+                            <input type="text" id="studentPronoun" value="em" placeholder="Ví dụ: em, anh, chị, bạn, con...">
+                        </div>
+                    </div>
+
                     <!-- Day Dropdown -->
                     <div class="form-group">
                         <label for="daySelect">Ngày học & Chủ đề <span style="color: var(--danger)">*</span></label>
@@ -1903,6 +1915,8 @@
 
             const studentId = document.getElementById("studentId").value.trim();
             const studentName = document.getElementById("studentName").value.trim();
+            const teacherPronoun = document.getElementById("teacherPronoun").value.trim() || "chị";
+            const studentPronoun = document.getElementById("studentPronoun").value.trim() || "em";
             const day = document.getElementById("daySelect").value;
             const essay = document.getElementById("essayContent").value.trim();
             
@@ -1943,7 +1957,9 @@
                 dayTitle: dayData.title,
                 promptQuestion: dayData.question,
                 essay: essay,
-                systemPrompt: compiledSystemPrompt
+                systemPrompt: compiledSystemPrompt,
+                teacherPronoun: teacherPronoun,
+                studentPronoun: studentPronoun
             };
 
             const gradingId = "grade_" + Date.now();
@@ -1979,7 +1995,9 @@
                     aiReview: cleanMarkdownResponse(result.aiReview),
                     sheetSyncFailed: result.sheetSyncFailed,
                     sheetUrl: result.sheetUrl || "",
-                    sheetName: result.sheetName || ""
+                    sheetName: result.sheetName || "",
+                    teacherPronoun: teacherPronoun,
+                    studentPronoun: studentPronoun
                 };
 
                 addToHistory(currentGradingResult);
@@ -1994,7 +2012,9 @@
                         dayTitle: dayData.title,
                         essay: essay,
                         aiReview: currentGradingResult.aiReview,
-                        errorMsg: result.sheetError || "Lỗi lưu Sheet"
+                        errorMsg: result.sheetError || "Lỗi lưu Sheet",
+                        teacherPronoun: teacherPronoun,
+                        studentPronoun: studentPronoun
                     });
                 } else {
                     showToast("Đã chấm bài và lưu vào Google Sheet thành công!", "success");
@@ -2176,6 +2196,8 @@
                 }
             });
             
+            const teacherPronoun = document.getElementById("teacherPronoun").value.trim() || "chị";
+            const studentPronoun = document.getElementById("studentPronoun").value.trim() || "em";
             const dayData = appConfig.daysData[currentGradingResult.day] || { title: "", question: "" };
             const payload = {
                 action: "rewrite_review",
@@ -2188,7 +2210,9 @@
                 essay: currentGradingResult.essay,
                 aiReview: currentGradingResult.aiReview, // previous review
                 feedback: feedbackText,
-                systemPrompt: compiledSystemPrompt
+                systemPrompt: compiledSystemPrompt,
+                teacherPronoun: teacherPronoun,
+                studentPronoun: studentPronoun
             };
             
             try {
@@ -2214,12 +2238,16 @@
                 currentGradingResult.sheetSyncFailed = result.sheetSyncFailed;
                 currentGradingResult.sheetUrl = result.sheetUrl || currentGradingResult.sheetUrl;
                 currentGradingResult.sheetName = result.sheetName || currentGradingResult.sheetName;
+                currentGradingResult.teacherPronoun = teacherPronoun;
+                currentGradingResult.studentPronoun = studentPronoun;
                 
                 // Update history item
                 const histIdx = gradingHistory.findIndex(h => h.id === currentGradingResult.id);
                 if (histIdx !== -1) {
                     gradingHistory[histIdx].aiReview = currentGradingResult.aiReview;
                     gradingHistory[histIdx].sheetSyncFailed = result.sheetSyncFailed;
+                    gradingHistory[histIdx].teacherPronoun = teacherPronoun;
+                    gradingHistory[histIdx].studentPronoun = studentPronoun;
                     if (result.sheetUrl) {
                         gradingHistory[histIdx].sheetUrl = result.sheetUrl;
                         gradingHistory[histIdx].sheetName = result.sheetName;
@@ -2239,7 +2267,9 @@
                         dayTitle: currentGradingResult.dayTitle,
                         essay: currentGradingResult.essay,
                         aiReview: currentGradingResult.aiReview,
-                        errorMsg: result.sheetError || "Lỗi lưu Sheet"
+                        errorMsg: result.sheetError || "Lỗi lưu Sheet",
+                        teacherPronoun: teacherPronoun,
+                        studentPronoun: studentPronoun
                     });
                 } else {
                     showToast("AI đã viết lại nhận xét và cập nhật Google Sheet thành công!", "success");
@@ -2309,6 +2339,8 @@
                 
                 document.getElementById("studentId").value = item.studentId;
                 document.getElementById("studentName").value = item.studentName;
+                document.getElementById("teacherPronoun").value = item.teacherPronoun || "chị";
+                document.getElementById("studentPronoun").value = item.studentPronoun || "em";
                 document.getElementById("daySelect").value = item.day;
                 document.getElementById("essayContent").value = item.essay;
                 updateDayPromptPreview();

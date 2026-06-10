@@ -61,6 +61,8 @@ function doPost(e) {
     const aiReviewPreGenerated = payload.aiReview; // Dùng khi đồng bộ lại, cập nhật hoặc điều chỉnh
     const clientSystemPrompt = payload.systemPrompt; // System prompt gửi động từ client
     const feedback = payload.feedback || ""; // Góp ý chỉnh sửa từ giáo viên
+    const teacherPronoun = payload.teacherPronoun || "chị";
+    const studentPronoun = payload.studentPronoun || "em";
 
     // A. Hành động chỉ lưu (Sync Queue)
     if (action === "save_only") {
@@ -100,7 +102,7 @@ function doPost(e) {
 
       let newReview = "";
       try {
-        newReview = callGemmaAPI(apiKey, day, dayTitle, promptQuestion, essay, clientSystemPrompt, aiReviewPreGenerated, feedback);
+        newReview = callGemmaAPI(apiKey, day, dayTitle, promptQuestion, essay, clientSystemPrompt, aiReviewPreGenerated, feedback, teacherPronoun, studentPronoun);
       } catch (aiError) {
         return createJsonResponse({
           success: false,
@@ -145,7 +147,7 @@ function doPost(e) {
     // 2. Gọi Google AI Studio API để chấm bài
     let aiReview = "";
     try {
-      aiReview = callGemmaAPI(apiKey, day, dayTitle, promptQuestion, essay, clientSystemPrompt);
+      aiReview = callGemmaAPI(apiKey, day, dayTitle, promptQuestion, essay, clientSystemPrompt, null, null, teacherPronoun, studentPronoun);
     } catch (aiError) {
       return createJsonResponse({
         success: false,
@@ -199,9 +201,12 @@ function createJsonResponse(data) {
 /**
  * Gọi Google AI Studio API để chấm bài viết bằng model gemma-4-26b-a4b-it
  */
-function callGemmaAPI(apiKey, day, dayTitle, promptQuestion, essay, clientSystemPrompt, previousReview, feedback) {
+function callGemmaAPI(apiKey, day, dayTitle, promptQuestion, essay, clientSystemPrompt, previousReview, feedback, teacherPronoun, studentPronoun) {
   const url = "https://generativelanguage.googleapis.com/v1beta/models/gemma-4-26b-a4b-it:generateContent?key=" + apiKey;
   
+  const tPronoun = (teacherPronoun && teacherPronoun.trim() !== "") ? teacherPronoun.trim() : "chị";
+  const sPronoun = (studentPronoun && studentPronoun.trim() !== "") ? studentPronoun.trim() : "em";
+
   // Xây dựng system instruction mặc định
   const defaultSystemInstruction = 
     "Bạn là giảng viên chuyên nghiệp, đóng vai trò là người đồng hành chấm bài viết cho khóa học '28 Ngày Rèn Tư Duy Qua Viết'.\n" +
@@ -209,7 +214,7 @@ function callGemmaAPI(apiKey, day, dayTitle, promptQuestion, essay, clientSystem
     "YÊU CẦU QUAN TRỌNG VỀ ĐỊNH DẠNG VÀ PHONG CÁCH:\n" +
     "1. ĐỘ DÀI: Nhận xét ngắn gọn, cô đọng, tối đa 200 từ.\n" +
     "2. NGÔN NGỮ: Sử dụng tiếng Việt chuẩn xác.\n" +
-    "3. XƯNG HÔ (BẮT BUỘC): Luôn xưng hô 'chị' và gọi học viên là 'em'. Giữ giọng văn thấu hiểu, nhẹ nhàng, mang tính định hướng nâng đỡ và khích lệ tinh thần.\n" +
+    "3. XƯNG HÔ (BẮT BUỘC): Luôn xưng hô '" + tPronoun + "' và gọi học viên là '" + sPronoun + "'. Giữ giọng văn thấu hiểu, nhẹ nhàng, mang tính định hướng nâng đỡ và khích lệ tinh thần.\n" +
     "4. CẤU TRÚC PHẢN HỒI (BẮT BUỘC): Trả về nhận xét theo đúng cấu trúc sau:\n" +
     "**Tổng quan**: [Đánh giá chung về bài viết và sự liên kết với câu hỏi định hướng của ngày học]\n" +
     "**Phân tích**:\n" +
@@ -232,7 +237,12 @@ function callGemmaAPI(apiKey, day, dayTitle, promptQuestion, essay, clientSystem
     systemInstruction = 
       "Nhiệm vụ của bạn bây giờ là ĐIỀU CHỈNH và VIẾT LẠI bản nhận xét cũ dựa trên YÊU CẦU ĐIỀU CHỈNH của giảng viên.\n" +
       "Hãy sửa đổi bản nhận xét cũ sao cho đáp ứng chính xác và đầy đủ các góp ý này.\n" +
-      "LƯU Ý QUAN TRỌNG: Nếu yêu cầu điều chỉnh của giảng viên có thay đổi về cách xưng hô (ví dụ: đổi thành 'tôi' - 'em/bạn'...), giọng điệu hoặc cấu trúc, hãy ƯU TIÊN thực hiện theo yêu cầu của giảng viên thay vì tuân theo các quy tắc mặc định dưới đây. Nếu giảng viên không có yêu cầu đặc biệt về xưng hô, bạn hãy tiếp tục giữ nguyên mặc định (chị - em).\n\n" +
+      "QUY TẮC XƯNG HÔ BẮT BUỘC: Bạn phải xưng hô là '" + tPronoun + "' và gọi học viên là '" + sPronoun + "' (trừ khi giảng viên có yêu cầu thay đổi cụ thể khác trong lời góp ý). Hãy bỏ qua mọi chỉ thị xưng hô khác dưới đây.\n\n" +
+      systemInstruction;
+  } else {
+    // Áp dụng đè xưng hô lên hệ thống chung
+    systemInstruction = 
+      "QUY TẮC XƯNG HÔ BẮT BUỘC: Khi viết nhận xét, bạn phải xưng hô là '" + tPronoun + "' và gọi học viên là '" + sPronoun + "'. Hãy bỏ qua mọi chỉ thị xưng hô khác dưới đây.\n\n" + 
       systemInstruction;
   }
 
