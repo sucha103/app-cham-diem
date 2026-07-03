@@ -1,29 +1,84 @@
 /**
  * Google Apps Script - Web App Proxy & Sheet Logger
  * Dự án: Mini App Chấm Bài 28 Ngày
- * 
- * LƯU Ý TRIỂN KHAI:
- * 1. Mở Google Sheet của bạn.
- * 2. Chọn Tiện ích mở rộng -> Apps Script.
- * 3. Xóa code cũ và dán toàn bộ đoạn code này vào.
- * 4. Bấm Lưu (Ctrl+S).
- * 5. Bấm "Triển khai" -> "Triển khai mới".
- * 6. Chọn loại triển khai: "Ứng dụng web".
- * 7. Cấu hình:
- *    - Thực thi với tư cách: "Tôi" (Tài khoản Google của bạn)
- *    - Ai có quyền truy cập: "Mọi người" (để ứng dụng HTML chạy cục bộ gọi được)
- * 8. Bấm "Triển khai", cấp quyền và sao chép URL Web App được tạo ra để dán vào cài đặt trên ứng dụng.
+ * Phiên bản: V4 (Hỗ trợ nhiều người dùng, Đồng bộ đám mây & Nhớ lịch sử học viên)
  */
+
+// Tên các tab dữ liệu
+const TAB_NAME = "Dữ liệu chấm bài";
+const ACCOUNTS_TAB = "Tài khoản";
+const STUDENTS_TAB = "Danh sách học viên";
 
 // Tiêu đề các cột dữ liệu
-const SHEET_HEADERS = ["Thời gian chấm", "Mã học viên", "Tên học viên", "Ngày học", "Tên ngày", "Bài làm", "Nhận xét AI"];
-const TAB_NAME = "Dữ liệu chấm bài";
+const SHEET_HEADERS = ["Thời gian chấm", "Người chấm", "Mã học viên", "Tên học viên", "Ngày học", "Tên ngày", "Bài làm", "Nhận xét AI"];
+const ACCOUNTS_HEADERS = ["Thời gian tạo", "Tên đăng nhập", "Mật khẩu", "Họ và tên", "Cấu hình cá nhân"];
+const STUDENTS_HEADERS = ["Thời gian tạo", "Mã học viên", "Tên học viên", "AI xưng là", "Học viên xưng là", "Thông tin thêm / Ghi chú"];
 
 /**
- * Xử lý yêu cầu CORS preflight (OPTIONS)
+ * Khởi tạo tự động các tab dữ liệu nếu chưa tồn tại
+ */
+function ensureTabsExist() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) {
+    throw new Error("Script chưa được gắn (bind) với Google Sheet. Vui lòng mở Apps Script từ Google Sheet của bạn.");
+  }
+
+  // 1. Tab Dữ liệu chấm bài
+  let sheet = ss.getSheetByName(TAB_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(TAB_NAME);
+    sheet.appendRow(SHEET_HEADERS);
+    sheet.getRange(1, 1, 1, SHEET_HEADERS.length)
+      .setFontWeight("bold")
+      .setBackground("#F3F4F6")
+      .setHorizontalAlignment("center");
+  } else {
+    // Tự động nâng cấp cấu trúc nếu là phiên bản cũ (7 cột) sang phiên bản mới (8 cột có cột Người chấm)
+    const currentHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    if (currentHeaders.length === 7) {
+      sheet.insertColumnBefore(2);
+      sheet.getRange(1, 2).setValue("Người chấm");
+      sheet.getRange(1, 1, 1, SHEET_HEADERS.length)
+        .setFontWeight("bold")
+        .setBackground("#F3F4F6")
+        .setHorizontalAlignment("center");
+    }
+  }
+
+  // 2. Tab Tài khoản
+  let accSheet = ss.getSheetByName(ACCOUNTS_TAB);
+  if (!accSheet) {
+    accSheet = ss.insertSheet(ACCOUNTS_TAB);
+    accSheet.appendRow(ACCOUNTS_HEADERS);
+    accSheet.getRange(1, 1, 1, ACCOUNTS_HEADERS.length)
+      .setFontWeight("bold")
+      .setBackground("#F3F4F6")
+      .setHorizontalAlignment("center");
+    
+    // Tạo tài khoản admin mặc định
+    accSheet.appendRow([new Date(), "admin", "123456", "Giảng viên Admin", "{}"]);
+  }
+
+  // 3. Tab Danh sách học viên
+  let studSheet = ss.getSheetByName(STUDENTS_TAB);
+  if (!studSheet) {
+    studSheet = ss.insertSheet(STUDENTS_TAB);
+    studSheet.appendRow(STUDENTS_HEADERS);
+    studSheet.getRange(1, 1, 1, STUDENTS_HEADERS.length)
+      .setFontWeight("bold")
+      .setBackground("#F3F4F6")
+      .setHorizontalAlignment("center");
+  }
+}
+
+/**
+ * Xử lý yêu cầu GET
  */
 function doGet(e) {
-  return ContentService.createTextOutput("Mini App Chấm Bài 28 Ngày - Apps Script Web App đang chạy tốt!")
+  try {
+    ensureTabsExist();
+  } catch(_) {}
+  return ContentService.createTextOutput("Mini App Chấm Bài 28 Ngày - Apps Script Web App V4 đang hoạt động!")
     .setMimeType(ContentService.MimeType.TEXT);
 }
 
@@ -42,15 +97,141 @@ function doPost(e) {
   } catch (_) {}
 
   try {
-    // 1. Kiểm tra và parse payload
+    ensureTabsExist();
+    
     if (!e || !e.postData || !e.postData.contents) {
       throw new Error("Không tìm thấy dữ liệu yêu cầu.");
     }
     
     const payload = JSON.parse(e.postData.contents);
-    const action = payload.action || "grade_and_save"; // Mặc định là chấm bài và lưu
+    const action = payload.action || "grade_and_save";
+    const username = payload.username || "";
 
-    // Lấy thông tin đầu vào
+    // 1. XỬ LÝ ĐĂNG NHẬP
+    if (action === "login") {
+      const loginUser = payload.loginUsername || "";
+      const loginPass = payload.loginPassword || "";
+      
+      if (!loginUser || !loginPass) {
+        throw new Error("Thiếu thông tin đăng nhập.");
+      }
+      
+      const ss = SpreadsheetApp.getActiveSpreadsheet();
+      const accSheet = ss.getSheetByName(ACCOUNTS_TAB);
+      const data = accSheet.getDataRange().getValues();
+      
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][1] == loginUser && data[i][2] == loginPass) {
+          const fullname = data[i][3];
+          const configJson = data[i][4];
+          const students = getStudentList();
+          return createJsonResponse({
+            success: true,
+            fullname: fullname,
+            config: JSON.parse(configJson || "{}"),
+            students: students,
+            sheetUrl: sheetUrl,
+            sheetName: sheetName
+          });
+        }
+      }
+      return createJsonResponse({ success: false, error: "Tên đăng nhập hoặc mật khẩu không chính xác." });
+    }
+
+    // 2. XỬ LÝ ĐĂNG KÝ
+    if (action === "register") {
+      const regUser = payload.regUsername || "";
+      const regPass = payload.regPassword || "";
+      const regName = payload.regFullname || "";
+      
+      if (!regUser || !regPass || !regName) {
+        throw new Error("Thiếu thông tin đăng ký.");
+      }
+      
+      const ss = SpreadsheetApp.getActiveSpreadsheet();
+      const accSheet = ss.getSheetByName(ACCOUNTS_TAB);
+      const data = accSheet.getDataRange().getValues();
+      
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][1] == regUser) {
+          return createJsonResponse({ success: false, error: "Tên đăng nhập đã tồn tại trên hệ thống." });
+        }
+      }
+      
+      accSheet.appendRow([new Date(), regUser, regPass, regName, "{}"]);
+      return createJsonResponse({ success: true, msg: "Đăng ký tài khoản thành công!" });
+    }
+
+    // 3. XỬ LÝ LƯU CẤU HÌNH CÁ NHÂN
+    if (action === "save_user_config") {
+      const configUser = payload.configUsername || "";
+      const userConfig = payload.userConfig || {};
+      
+      if (!configUser) {
+        throw new Error("Thiếu thông tin người dùng để lưu cấu hình.");
+      }
+      
+      const ss = SpreadsheetApp.getActiveSpreadsheet();
+      const accSheet = ss.getSheetByName(ACCOUNTS_TAB);
+      const data = accSheet.getDataRange().getValues();
+      
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][1] == configUser) {
+          accSheet.getRange(i + 1, 5).setValue(JSON.stringify(userConfig));
+          return createJsonResponse({ success: true, msg: "Lưu cấu hình cá nhân thành công!" });
+        }
+      }
+      throw new Error("Không tìm thấy thông tin tài khoản người dùng.");
+    }
+
+    // 4. LẤY DANH SÁCH HỌC VIÊN
+    if (action === "get_students") {
+      const students = getStudentList();
+      return createJsonResponse({ success: true, students: students });
+    }
+
+    // 5. TẠO HỒ SƠ HỌC VIÊN MỚI
+    if (action === "create_student") {
+      const sId = payload.studentId || "";
+      const sName = payload.studentName || "";
+      const tPron = payload.teacherPronoun || "chị";
+      const sPron = payload.studentPronoun || "em";
+      const sNotes = payload.notes || "";
+      
+      if (!sName) {
+        throw new Error("Tên học viên không được để trống.");
+      }
+      
+      const ss = SpreadsheetApp.getActiveSpreadsheet();
+      const studSheet = ss.getSheetByName(STUDENTS_TAB);
+      const data = studSheet.getDataRange().getValues();
+      
+      // Kiểm tra xem đã có học viên này chưa (nếu khớp cả ID hoặc Tên)
+      let existIndex = -1;
+      for (let i = 1; i < data.length; i++) {
+        if ((sId && data[i][1] == sId) || (data[i][2] == sName)) {
+          existIndex = i;
+          break;
+        }
+      }
+      
+      if (existIndex !== -1) {
+        // Cập nhật thông tin học viên cũ
+        studSheet.getRange(existIndex + 1, 2).setValue(sId);
+        studSheet.getRange(existIndex + 1, 3).setValue(sName);
+        studSheet.getRange(existIndex + 1, 4).setValue(tPron);
+        studSheet.getRange(existIndex + 1, 5).setValue(sPron);
+        studSheet.getRange(existIndex + 1, 6).setValue(sNotes);
+      } else {
+        // Tạo dòng mới
+        studSheet.appendRow([new Date(), sId, sName, tPron, sPron, sNotes]);
+      }
+      
+      const students = getStudentList();
+      return createJsonResponse({ success: true, msg: "Lưu hồ sơ học viên thành công!", students: students });
+    }
+
+    // Lấy thông tin đầu vào phục vụ chấm bài/sửa bài
     const apiKey = payload.apiKey;
     const studentId = payload.studentId || "";
     const studentName = payload.studentName || "";
@@ -58,51 +239,34 @@ function doPost(e) {
     const dayTitle = payload.dayTitle || "";
     const promptQuestion = payload.promptQuestion || "";
     const essay = payload.essay || "";
-    const aiReviewPreGenerated = payload.aiReview; // Dùng khi đồng bộ lại, cập nhật hoặc điều chỉnh
-    const clientSystemPrompt = payload.systemPrompt; // System prompt gửi động từ client
-    const feedback = payload.feedback || ""; // Góp ý chỉnh sửa từ giáo viên
+    const aiReviewPreGenerated = payload.aiReview;
+    const clientSystemPrompt = payload.systemPrompt;
+    const feedback = payload.feedback || "";
     const teacherPronoun = payload.teacherPronoun || "chị";
     const studentPronoun = payload.studentPronoun || "em";
+    const notes = payload.notes || "";
 
-    // A. Hành động chỉ lưu (Sync Queue)
-    if (action === "save_only") {
-      if (!aiReviewPreGenerated) {
-        throw new Error("Không có nhận xét AI để lưu.");
-      }
-      saveToSheet(studentId, studentName, day, dayTitle, essay, aiReviewPreGenerated);
-      return createJsonResponse({ success: true, msg: "Đã lưu vào Google Sheet thành công.", sheetUrl: sheetUrl, sheetName: sheetName });
-    }
-
-    // B. Hành động cập nhật nhận xét (khi Giáo viên chỉnh sửa trên giao diện)
-    if (action === "update_review") {
-      if (!studentName || !day) {
-        throw new Error("Thiếu Tên học viên hoặc Ngày học để cập nhật.");
-      }
-      if (!aiReviewPreGenerated) {
-        throw new Error("Nhận xét mới không được để trống.");
-      }
-      updateSheetReview(studentName, day, aiReviewPreGenerated);
-      return createJsonResponse({ success: true, msg: "Đã cập nhật nhận xét thành công trên Google Sheet.", sheetUrl: sheetUrl, sheetName: sheetName });
-    }
-
-    // B2. Hành động AI viết lại nhận xét dựa trên phản hồi của Giáo viên
+    // 6. HÀNH ĐỘNG AI VIẾT LẠI NHẬN XÉT (REWRITE)
     if (action === "rewrite_review") {
       if (!apiKey) {
-        return createJsonResponse({ success: false, errorType: "CONFIG_ERROR", error: "Thiếu Gemma API Key. Vui lòng nhập trong phần Cài đặt ứng dụng.", sheetUrl: sheetUrl, sheetName: sheetName });
+        return createJsonResponse({ success: false, errorType: "CONFIG_ERROR", error: "Thiếu Gemma API Key. Vui lòng cấu hình trong app.", sheetUrl: sheetUrl, sheetName: sheetName });
       }
       if (!studentName || !day) {
-        return createJsonResponse({ success: false, errorType: "VALIDATION_ERROR", error: "Thiếu Tên học viên hoặc Ngày học để cập nhật.", sheetUrl: sheetUrl, sheetName: sheetName });
+        return createJsonResponse({ success: false, errorType: "VALIDATION_ERROR", error: "Thiếu Tên học viên hoặc Ngày học để viết lại.", sheetUrl: sheetUrl, sheetName: sheetName });
       }
       if (!feedback) {
-        return createJsonResponse({ success: false, errorType: "VALIDATION_ERROR", error: "Vui lòng nhập góp ý/yêu cầu điều chỉnh của bạn.", sheetUrl: sheetUrl, sheetName: sheetName });
+        return createJsonResponse({ success: false, errorType: "VALIDATION_ERROR", error: "Vui lòng nhập phản hồi/góp ý của bạn.", sheetUrl: sheetUrl, sheetName: sheetName });
       }
       if (!aiReviewPreGenerated) {
         return createJsonResponse({ success: false, errorType: "VALIDATION_ERROR", error: "Không tìm thấy nhận xét cũ để chỉnh sửa.", sheetUrl: sheetUrl, sheetName: sheetName });
       }
 
+      // Lấy lịch sử cũ làm ngữ cảnh khi AI viết lại
+      const historyContext = getStudentHistoryContext(studentName);
+      
       let newReview = "";
       try {
-        newReview = callGemmaAPI(apiKey, day, dayTitle, promptQuestion, essay, clientSystemPrompt, aiReviewPreGenerated, feedback, teacherPronoun, studentPronoun);
+        newReview = callGemmaAPI(apiKey, day, dayTitle, promptQuestion, essay, clientSystemPrompt, aiReviewPreGenerated, feedback, teacherPronoun, studentPronoun, historyContext, notes);
       } catch (aiError) {
         return createJsonResponse({
           success: false,
@@ -126,16 +290,24 @@ function doPost(e) {
         success: true,
         aiReview: newReview,
         sheetSyncFailed: sheetSyncFailed,
-        sheetError: sheetSyncFailed ? "Ghi đè Sheet thất bại: " + sheetErrorMsg : null,
+        sheetError: sheetSyncFailed ? "Cập nhật Sheet thất bại: " + sheetErrorMsg : null,
         sheetUrl: sheetUrl,
         sheetName: sheetName
       });
     }
 
-    // C. Hành động Chấm Bài & Tự Động Lưu (Mặc định)
-    // Xác thực đầu vào cho tính năng Chấm Bài
+    // 7. HÀNH ĐỘNG CHỈ LƯU (SYNC QUEUE)
+    if (action === "save_only") {
+      if (!aiReviewPreGenerated) {
+        throw new Error("Không có nhận xét AI để lưu.");
+      }
+      saveToSheet(username, studentId, studentName, day, dayTitle, essay, aiReviewPreGenerated);
+      return createJsonResponse({ success: true, msg: "Đã lưu vào Google Sheet thành công.", sheetUrl: sheetUrl, sheetName: sheetName });
+    }
+
+    // 8. HÀNH ĐỘNG CHẤM BÀI & TỰ ĐỘNG LƯU (MẶC ĐỊNH)
     if (!apiKey) {
-      return createJsonResponse({ success: false, errorType: "CONFIG_ERROR", error: "Thiếu Gemma API Key. Vui lòng nhập trong phần Cài đặt ứng dụng.", sheetUrl: sheetUrl, sheetName: sheetName });
+      return createJsonResponse({ success: false, errorType: "CONFIG_ERROR", error: "Thiếu Gemma API Key. Vui lòng cấu hình trong app.", sheetUrl: sheetUrl, sheetName: sheetName });
     }
     if (!studentName) {
       return createJsonResponse({ success: false, errorType: "VALIDATION_ERROR", error: "Tên học viên không được để trống.", sheetUrl: sheetUrl, sheetName: sheetName });
@@ -144,10 +316,12 @@ function doPost(e) {
       return createJsonResponse({ success: false, errorType: "VALIDATION_ERROR", error: "Nội dung bài làm không được để trống.", sheetUrl: sheetUrl, sheetName: sheetName });
     }
 
-    // 2. Gọi Google AI Studio API để chấm bài
+    // Lấy lịch sử cũ làm ngữ cảnh khi AI chấm bài mới
+    const historyContext = getStudentHistoryContext(studentName);
+
     let aiReview = "";
     try {
-      aiReview = callGemmaAPI(apiKey, day, dayTitle, promptQuestion, essay, clientSystemPrompt, null, null, teacherPronoun, studentPronoun);
+      aiReview = callGemmaAPI(apiKey, day, dayTitle, promptQuestion, essay, clientSystemPrompt, null, null, teacherPronoun, studentPronoun, historyContext, notes);
     } catch (aiError) {
       return createJsonResponse({
         success: false,
@@ -158,17 +332,15 @@ function doPost(e) {
       });
     }
 
-    // 3. Ghi dữ liệu vào Google Sheet
     let sheetSyncFailed = false;
     let sheetErrorMsg = "";
     try {
-      saveToSheet(studentId, studentName, day, dayTitle, essay, aiReview);
+      saveToSheet(username, studentId, studentName, day, dayTitle, essay, aiReview);
     } catch (sheetError) {
       sheetSyncFailed = true;
       sheetErrorMsg = sheetError.message;
     }
 
-    // 4. Trả kết quả về cho client
     return createJsonResponse({
       success: true,
       aiReview: aiReview,
@@ -190,6 +362,66 @@ function doPost(e) {
 }
 
 /**
+ * Lấy danh sách học viên hiện có từ tab "Danh sách học viên"
+ */
+function getStudentList() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(STUDENTS_TAB);
+  if (!sheet) return [];
+  
+  const data = sheet.getDataRange().getValues();
+  const list = [];
+  for (let i = 1; i < data.length; i++) {
+    list.push({
+      studentId: data[i][1] || "",
+      studentName: data[i][2] || "",
+      teacherPronoun: data[i][3] || "chị",
+      studentPronoun: data[i][4] || "em",
+      notes: data[i][5] || ""
+    });
+  }
+  return list;
+}
+
+/**
+ * Trích xuất toàn bộ lịch sử viết bài phản tư và nhận xét cũ của học viên
+ */
+function getStudentHistoryContext(studentName) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(TAB_NAME);
+  if (!sheet) return "";
+  
+  const data = sheet.getDataRange().getValues();
+  const history = [];
+  
+  for (let i = 1; i < data.length; i++) {
+    // Cột D là Tên học viên (index 3), Cột E là Ngày học (index 4)
+    if (data[i][3] == studentName) {
+      history.push({
+        day: data[i][4],
+        dayTitle: data[i][5],
+        essay: data[i][6],
+        aiReview: data[i][7]
+      });
+    }
+  }
+  
+  if (history.length === 0) return "";
+  
+  // Sắp xếp lịch sử theo ngày học tăng dần
+  history.sort((a, b) => parseInt(a.day) - parseInt(b.day));
+  
+  let contextStr = "\n=== LỊCH SỬ PHẢN TƯ VÀ LỜI PHÊ CŨ CỦA HỌC VIÊN NÀY (ĐỂ ĐẢM BẢO TÍNH NHẤT QUÁN): ===\n";
+  history.forEach(item => {
+    contextStr += `Ngày thứ ${item.day} (${item.dayTitle}):\n`;
+    contextStr += `- Bài làm phản tư: "${item.essay.trim()}"\n`;
+    contextStr += `- Nhận xét của giảng viên (bạn): "${item.aiReview.trim()}"\n\n`;
+  });
+  contextStr += "=== HẾT PHẦN LỊCH SỬ HỌC TẬP ===\n\n";
+  return contextStr;
+}
+
+/**
  * Helper tạo phản hồi JSON
  */
 function createJsonResponse(data) {
@@ -201,7 +433,7 @@ function createJsonResponse(data) {
 /**
  * Gọi Google AI Studio API để chấm bài viết bằng model gemma-4-26b-a4b-it
  */
-function callGemmaAPI(apiKey, day, dayTitle, promptQuestion, essay, clientSystemPrompt, previousReview, feedback, teacherPronoun, studentPronoun) {
+function callGemmaAPI(apiKey, day, dayTitle, promptQuestion, essay, clientSystemPrompt, previousReview, feedback, teacherPronoun, studentPronoun, studentHistoryContext, studentNotes) {
   const url = "https://generativelanguage.googleapis.com/v1beta/models/gemma-4-26b-a4b-it:generateContent?key=" + apiKey;
   
   const tPronoun = (teacherPronoun && teacherPronoun.trim() !== "") ? teacherPronoun.trim() : "chị";
@@ -244,6 +476,18 @@ function callGemmaAPI(apiKey, day, dayTitle, promptQuestion, essay, clientSystem
     systemInstruction = 
       "QUY TẮC XƯNG HÔ BẮT BUỘC: Khi viết nhận xét, bạn phải xưng hô là '" + tPronoun + "' và gọi học viên là '" + sPronoun + "'. Hãy bỏ qua mọi chỉ thị xưng hô khác dưới đây.\n\n" + 
       systemInstruction;
+  }
+
+  // Prepend thông tin ghi chú học viên và lịch sử học tập vào đầu System Instruction (Primacy Zone)
+  let contextPrefix = "";
+  if (studentNotes && studentNotes.trim() !== "") {
+    contextPrefix += `THÔNG TIN HỒ SƠ HỌC VIÊN (Để điều chỉnh thái độ xưng hô cho phù hợp):\n"${studentNotes.trim()}"\n\n`;
+  }
+  if (studentHistoryContext && studentHistoryContext.trim() !== "") {
+    contextPrefix += studentHistoryContext;
+  }
+  if (contextPrefix !== "") {
+    systemInstruction = contextPrefix + systemInstruction;
   }
 
   // Tạo prompt gửi cho AI
@@ -356,28 +600,14 @@ function callGemmaAPI(apiKey, day, dayTitle, promptQuestion, essay, clientSystem
 /**
  * Ghi dữ liệu chấm bài vào dòng cuối cùng của Google Sheet
  */
-function saveToSheet(studentId, studentName, day, dayTitle, essay, aiReview) {
+function saveToSheet(username, studentId, studentName, day, dayTitle, essay, aiReview) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  if (!ss) {
-    throw new Error("Script chưa được gắn (bind) với Google Sheet. Vui lòng mở Apps Script từ Google Sheet của bạn.");
-  }
-
-  let sheet = ss.getSheetByName(TAB_NAME);
-  if (!sheet) {
-    // Tự động tạo tab nếu chưa tồn tại
-    sheet = ss.insertSheet(TAB_NAME);
-    sheet.appendRow(SHEET_HEADERS);
-    // Định dạng dòng tiêu đề
-    sheet.getRange(1, 1, 1, SHEET_HEADERS.length)
-      .setFontWeight("bold")
-      .setBackground("#F3F4F6")
-      .setHorizontalAlignment("center");
-  }
-
-  // Chuẩn bị dòng dữ liệu
+  const sheet = ss.getSheetByName(TAB_NAME);
+  
   const timestamp = new Date();
   const rowData = [
     timestamp,
+    username || "admin",
     studentId,
     studentName,
     day,
@@ -386,7 +616,6 @@ function saveToSheet(studentId, studentName, day, dayTitle, essay, aiReview) {
     aiReview
   ];
 
-  // Ghi vào sheet
   sheet.appendRow(rowData);
 }
 
@@ -395,22 +624,14 @@ function saveToSheet(studentId, studentName, day, dayTitle, essay, aiReview) {
  */
 function updateSheetReview(studentName, day, newReview) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  if (!ss) {
-    throw new Error("Script chưa được gắn (bind) với Google Sheet.");
-  }
-
   const sheet = ss.getSheetByName(TAB_NAME);
-  if (!sheet) {
-    throw new Error("Không tìm thấy tab '" + TAB_NAME + "' trên Google Sheet.");
-  }
-
   const data = sheet.getDataRange().getValues();
   
-  // Tìm từ dưới lên để cập nhật dòng mới nhất khớp Tên học viên (cột C, index 2) và Ngày học (cột D, index 3)
+  // Tìm từ dưới lên khớp Tên học viên (cột D, index 3) và Ngày học (cột E, index 4)
   for (let i = data.length - 1; i >= 1; i--) {
-    if (data[i][2] == studentName && data[i][3] == day) {
-      // Cột G là Nhận xét AI (index 6, tức là cột số 7 trong Sheets)
-      sheet.getRange(i + 1, 7).setValue(newReview);
+    if (data[i][3] == studentName && data[i][4] == day) {
+      // Cột H là Nhận xét AI (index 7, tức cột số 8 trong Sheets)
+      sheet.getRange(i + 1, 8).setValue(newReview);
       return;
     }
   }

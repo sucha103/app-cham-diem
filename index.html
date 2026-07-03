@@ -1004,6 +1004,53 @@
             border-radius: 6px;
             background: rgba(0, 0, 0, 0.1);
         }
+
+        /* Login & Student Modals Styling */
+        .login-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(11, 15, 25, 0.85);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+        .login-card {
+            width: 90%;
+            max-width: 420px;
+            padding: 2.25rem;
+            border-radius: 16px;
+            box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.6);
+            background: var(--bg-glass);
+            border: 1px solid var(--border-glass);
+            animation: cardScaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        @keyframes cardScaleIn {
+            from { transform: scale(0.9); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        .login-overlay input[type="password"] {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-glass);
+            border-radius: 10px;
+            color: var(--text-main);
+            font-family: var(--font-main);
+            font-size: 0.95rem;
+            transition: all 0.2s ease;
+            outline: none;
+        }
+        .login-overlay input[type="password"]:focus {
+            border-color: var(--primary);
+            background: rgba(255, 255, 255, 0.06);
+            box-shadow: 0 0 0 3px var(--primary-glow);
+        }
     </style>
 </head>
 <body>
@@ -1046,17 +1093,28 @@
                         </div>
                     </div>
 
-                    <!-- Student details -->
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="studentId">Mã học viên (Optional)</label>
-                            <input type="text" id="studentId" placeholder="Tự điền khi tải docx hoặc nhập tay">
+                    <!-- Student Selection & Directory -->
+                    <div class="form-group">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <label for="studentSelect" style="margin-bottom: 0;">Chọn học viên lớp <span style="color: var(--danger)">*</span></label>
+                            <button type="button" class="btn btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; height: auto; display: flex; align-items: center; gap: 0.25rem;" id="createNewStudentBtn">
+                                <i data-lucide="user-plus" style="width: 12px; height: 12px;"></i> Tạo học viên mới
+                            </button>
                         </div>
-                        <div class="form-group">
-                            <label for="studentName">Tên học viên <span style="color: var(--danger)">*</span></label>
-                            <input type="text" id="studentName" placeholder="Tự điền khi tải docx hoặc nhập tay" required>
-                        </div>
+                        <select id="studentSelect" required style="cursor: pointer;">
+                            <option value="">-- Click chọn học viên --</option>
+                        </select>
                     </div>
+
+                    <!-- Selected Student Details (Hidden/Collapsed read-only details) -->
+                    <div class="form-row" id="selectedStudentInfoRow" style="display: none; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-glass); border-radius: 8px; padding: 0.6rem 0.75rem; margin-bottom: 1.25rem; font-size: 0.85rem;">
+                        <div><strong>Mã HV:</strong> <span id="infoStudentId">-</span></div>
+                        <div><strong>Ghi chú:</strong> <span id="infoStudentNotes">-</span></div>
+                    </div>
+
+                    <!-- Hidden inputs to remain backward compatible with code that reads from #studentId and #studentName -->
+                    <input type="hidden" id="studentId">
+                    <input type="hidden" id="studentName">
 
                     <!-- Pronouns configuration -->
                     <div class="form-row">
@@ -1531,6 +1589,333 @@
         let currentGradingResult = null;
         let isEditMode = false;
 
+        // Authentication & User Management State
+        let currentUser = null;
+        let studentList = [];
+
+        async function checkAutoLogin() {
+            const savedUser = localStorage.getItem("mini_grading_user");
+            const appsScriptUrl = document.getElementById("appsScriptUrl").value.trim() || appConfig.appsScriptUrl;
+            
+            if (savedUser && appsScriptUrl) {
+                try {
+                    const parsedUser = JSON.parse(savedUser);
+                    document.getElementById("loginSubmitBtn").disabled = true;
+                    document.getElementById("loginSubmitBtn").innerHTML = `<span class="spinner" style="display:inline-block; width:12px; height:12px; border:2px solid #fff; border-top-color:transparent; border-radius:50%; animation:spin 1s linear infinite; margin-right:5px;"></span> Đang đăng nhập...`;
+                    
+                    const response = await fetch(appsScriptUrl, {
+                        method: "POST",
+                        mode: "cors",
+                        headers: {
+                            "Content-Type": "text/plain"
+                        },
+                        body: JSON.stringify({
+                            action: "login",
+                            loginUsername: parsedUser.username,
+                            loginPassword: parsedUser.password
+                        })
+                    });
+                    
+                    const resText = await response.text();
+                    const resJson = JSON.parse(resText);
+                    
+                    if (resJson.success) {
+                        currentUser = {
+                            username: parsedUser.username,
+                            password: parsedUser.password,
+                            fullname: resJson.fullname
+                        };
+                        
+                        // Apply Cloud Config (System Prompt and API Key)
+                        if (resJson.config) {
+                            if (resJson.config.apiKey) appConfig.apiKey = resJson.config.apiKey;
+                            if (resJson.config.systemPrompt) appConfig.systemPrompt = resJson.config.systemPrompt;
+                            localStorage.setItem("mini_grading_config", JSON.stringify(appConfig));
+                            
+                            // Re-load to inputs
+                            document.getElementById("gemmaApiKey").value = appConfig.apiKey;
+                            document.getElementById("systemPrompt").value = appConfig.systemPrompt;
+                        }
+                        
+                        studentList = resJson.students || [];
+                        renderStudentSelect();
+                        
+                        // Hide login overlay
+                        document.getElementById("loginOverlay").style.display = "none";
+                        showToast(`Chào mừng ${resJson.fullname} quay trở lại!`, "success");
+                    } else {
+                        // Clear invalid saved user
+                        localStorage.removeItem("mini_grading_user");
+                        document.getElementById("loginOverlay").style.display = "flex";
+                        showToast("Phiên đăng nhập cũ đã hết hạn hoặc mật khẩu đã đổi.", "warning");
+                    }
+                } catch (e) {
+                    console.error("Lỗi tự động đăng nhập:", e);
+                    document.getElementById("loginOverlay").style.display = "flex";
+                    showToast("Không thể kết nối đến máy chủ để tự động đăng nhập.", "error");
+                } finally {
+                    document.getElementById("loginSubmitBtn").disabled = false;
+                    document.getElementById("loginSubmitBtn").innerHTML = `<i data-lucide="log-in"></i> Đăng nhập`;
+                    lucide.createIcons();
+                }
+            } else {
+                document.getElementById("loginOverlay").style.display = "flex";
+            }
+        }
+
+        async function handleLogin() {
+            const usernameInput = document.getElementById("loginUsername").value.trim();
+            const passwordInput = document.getElementById("loginPassword").value.trim();
+            const rememberMe = document.getElementById("rememberMe").checked;
+            
+            const appsScriptUrl = document.getElementById("appsScriptUrl").value.trim() || appConfig.appsScriptUrl;
+            
+            if (!appsScriptUrl) {
+                showToast("Vui lòng cấu hình URL Apps Script trong phần Cấu hình trước!", "error");
+                openModal();
+                const tabBtn = document.querySelector('[data-target="tabConnection"]');
+                if (tabBtn) tabBtn.click();
+                return;
+            }
+            
+            if (!usernameInput || !passwordInput) {
+                showToast("Vui lòng nhập đầy đủ Tên đăng nhập và Mật khẩu!", "error");
+                return;
+            }
+            
+            try {
+                const btn = document.getElementById("loginSubmitBtn");
+                btn.disabled = true;
+                btn.innerHTML = `<span class="spinner" style="display:inline-block; width:12px; height:12px; border:2px solid #fff; border-top-color:transparent; border-radius:50%; animation:spin 1s linear infinite; margin-right:5px;"></span> Đang đăng nhập...`;
+                
+                const response = await fetch(appsScriptUrl, {
+                    method: "POST",
+                    mode: "cors",
+                    headers: {
+                        "Content-Type": "text/plain"
+                    },
+                    body: JSON.stringify({
+                        action: "login",
+                        loginUsername: usernameInput,
+                        loginPassword: passwordInput
+                    })
+                });
+                
+                const resText = await response.text();
+                const resJson = JSON.parse(resText);
+                
+                if (resJson.success) {
+                    currentUser = {
+                        username: usernameInput,
+                        password: passwordInput,
+                        fullname: resJson.fullname
+                    };
+                    
+                    if (rememberMe) {
+                        localStorage.setItem("mini_grading_user", JSON.stringify({
+                            username: usernameInput,
+                            password: passwordInput
+                        }));
+                    } else {
+                        localStorage.removeItem("mini_grading_user");
+                    }
+                    
+                    // Apply Cloud Config (System Prompt and API Key)
+                    if (resJson.config) {
+                        if (resJson.config.apiKey) appConfig.apiKey = resJson.config.apiKey;
+                        if (resJson.config.systemPrompt) appConfig.systemPrompt = resJson.config.systemPrompt;
+                        localStorage.setItem("mini_grading_config", JSON.stringify(appConfig));
+                        
+                        // Re-load inputs
+                        document.getElementById("gemmaApiKey").value = appConfig.apiKey;
+                        document.getElementById("systemPrompt").value = appConfig.systemPrompt;
+                    }
+                    
+                    studentList = resJson.students || [];
+                    renderStudentSelect();
+                    
+                    // Hide login overlay
+                    document.getElementById("loginOverlay").style.display = "none";
+                    showToast(`Đăng nhập thành công! Xin chào ${resJson.fullname}.`, "success");
+                } else {
+                    showToast(resJson.error || "Tên đăng nhập hoặc mật khẩu không chính xác.", "error");
+                }
+            } catch (e) {
+                console.error("Lỗi đăng nhập:", e);
+                showToast("Lỗi kết nối đến Google Sheets. Vui lòng kiểm tra lại URL Apps Script.", "error");
+            } finally {
+                const btn = document.getElementById("loginSubmitBtn");
+                btn.disabled = false;
+                btn.innerHTML = `<i data-lucide="log-in"></i> Đăng nhập`;
+                lucide.createIcons();
+            }
+        }
+
+        async function handleRegister() {
+            const usernameInput = document.getElementById("regUsername").value.trim();
+            const fullnameInput = document.getElementById("regFullname").value.trim();
+            const passwordInput = document.getElementById("regPassword").value.trim();
+            
+            const appsScriptUrl = document.getElementById("appsScriptUrl").value.trim() || appConfig.appsScriptUrl;
+            
+            if (!appsScriptUrl) {
+                showToast("Vui lòng cấu hình URL Apps Script trong phần Cấu hình trước!", "error");
+                openModal();
+                return;
+            }
+            
+            if (!usernameInput || !fullnameInput || !passwordInput) {
+                showToast("Vui lòng nhập đầy đủ các trường thông tin đăng ký!", "error");
+                return;
+            }
+            
+            try {
+                const btn = document.getElementById("registerSubmitBtn");
+                btn.disabled = true;
+                btn.innerHTML = `<span class="spinner" style="display:inline-block; width:12px; height:12px; border:2px solid #fff; border-top-color:transparent; border-radius:50%; animation:spin 1s linear infinite; margin-right:5px;"></span> Đang đăng ký...`;
+                
+                const response = await fetch(appsScriptUrl, {
+                    method: "POST",
+                    mode: "cors",
+                    headers: {
+                        "Content-Type": "text/plain"
+                    },
+                    body: JSON.stringify({
+                        action: "register",
+                        regUsername: usernameInput,
+                        regPassword: passwordInput,
+                        regFullname: fullnameInput
+                    })
+                });
+                
+                const resText = await response.text();
+                const resJson = JSON.parse(resText);
+                
+                if (resJson.success) {
+                    showToast("Đăng ký thành công! Bạn có thể đăng nhập ngay.", "success");
+                    document.getElementById("toggleAuthModeLink").click();
+                    document.getElementById("loginUsername").value = usernameInput;
+                    document.getElementById("loginPassword").focus();
+                } else {
+                    showToast(resJson.error || "Đăng ký thất bại. Tên đăng nhập đã tồn tại.", "error");
+                }
+            } catch (e) {
+                console.error("Lỗi đăng ký:", e);
+                showToast("Lỗi kết nối khi đăng ký. Kiểm tra lại kết nối mạng hoặc URL Apps Script.", "error");
+            } finally {
+                const btn = document.getElementById("registerSubmitBtn");
+                btn.disabled = false;
+                btn.innerHTML = `<i data-lucide="user-plus"></i> Đăng ký tài khoản`;
+                lucide.createIcons();
+            }
+        }
+
+        // Student Directory & Sync
+        function renderStudentSelect() {
+            const select = document.getElementById("studentSelect");
+            select.innerHTML = '<option value="">-- Click chọn học viên --</option>';
+            
+            studentList.sort((a, b) => a.studentName.localeCompare(b.studentName, 'vi'));
+            
+            studentList.forEach(student => {
+                const option = document.createElement("option");
+                option.value = student.studentName;
+                option.textContent = `${student.studentName} ${student.studentId ? `(${student.studentId})` : ""}`;
+                select.appendChild(option);
+            });
+        }
+
+        function showCreateStudentModal(prefilledName = "", prefilledId = "") {
+            document.getElementById("newStudentName").value = prefilledName;
+            document.getElementById("newStudentId").value = prefilledId;
+            document.getElementById("newTeacherPron").value = document.getElementById("teacherPronoun").value || "chị";
+            document.getElementById("newStudentPron").value = document.getElementById("studentPronoun").value || "em";
+            document.getElementById("newStudentNotes").value = "";
+            
+            document.getElementById("studentModal").style.display = "flex";
+        }
+
+        async function saveNewStudent() {
+            const name = document.getElementById("newStudentName").value.trim();
+            const id = document.getElementById("newStudentId").value.trim();
+            const teacherPron = document.getElementById("newTeacherPron").value.trim() || "chị";
+            const studentPron = document.getElementById("newStudentPron").value.trim() || "em";
+            const notes = document.getElementById("newStudentNotes").value.trim();
+            
+            if (!name) {
+                showToast("Tên học viên không được bỏ trống!", "error");
+                return;
+            }
+            
+            const appsScriptUrl = appConfig.appsScriptUrl;
+            if (!appsScriptUrl) {
+                showToast("Vui lòng cấu hình URL Apps Script trước!", "error");
+                return;
+            }
+            
+            try {
+                showToast("Đang lưu hồ sơ học viên...", "info");
+                
+                const response = await fetch(appsScriptUrl, {
+                    method: "POST",
+                    mode: "cors",
+                    headers: {
+                        "Content-Type": "text/plain"
+                    },
+                    body: JSON.stringify({
+                        action: "create_student",
+                        studentId: id,
+                        studentName: name,
+                        teacherPronoun: teacherPron,
+                        studentPronoun: studentPron,
+                        notes: notes
+                    })
+                });
+                
+                const resText = await response.text();
+                const resJson = JSON.parse(resText);
+                
+                if (resJson.success) {
+                    studentList = resJson.students || [];
+                    renderStudentSelect();
+                    
+                    document.getElementById("studentSelect").value = name;
+                    document.getElementById("studentSelect").dispatchEvent(new Event('change'));
+                    
+                    document.getElementById("studentModal").style.display = "none";
+                    showToast("Đã lưu hồ sơ học viên thành công!", "success");
+                } else {
+                    showToast(resJson.error || "Không thể lưu học viên.", "error");
+                }
+            } catch (e) {
+                console.error("Lỗi lưu học viên:", e);
+                showToast("Lỗi kết nối mạng khi lưu học viên.", "error");
+            }
+        }
+
+        async function syncUserConfigToCloud() {
+            if (!currentUser || !appConfig.appsScriptUrl) return;
+            try {
+                await fetch(appConfig.appsScriptUrl, {
+                    method: "POST",
+                    mode: "cors",
+                    headers: {
+                        "Content-Type": "text/plain"
+                    },
+                    body: JSON.stringify({
+                        action: "save_user_config",
+                        configUsername: currentUser.username,
+                        userConfig: {
+                            apiKey: appConfig.apiKey,
+                            systemPrompt: appConfig.systemPrompt
+                        }
+                    })
+                });
+            } catch (e) {
+                console.error("Lỗi đồng bộ cấu hình lên Cloud:", e);
+            }
+        }
+
         // Initialize App
         window.addEventListener("DOMContentLoaded", () => {
             loadConfig();
@@ -1544,6 +1929,7 @@
             renderMainSkillsCheckboxes();
             updateDayPromptPreview();
             registerEventListeners();
+            checkAutoLogin();
             lucide.createIcons();
         });
 
@@ -1613,6 +1999,8 @@
 
             localStorage.setItem("mini_grading_config", JSON.stringify(appConfig));
             showToast("Đã lưu cấu hình thành công!", "success");
+            
+            syncUserConfigToCloud();
             
             initDaySelect();
             renderMainSkillsCheckboxes();
@@ -1913,13 +2301,36 @@
                         const studentId = contentData.studentId || filenameData.studentId;
                         const day = contentData.day || filenameData.day;
                         
-                        // Populate inputs
+                        // Populate inputs & match student select
+                        let matched = false;
                         if (studentName) {
-                            document.getElementById("studentName").value = studentName;
+                            const select = document.getElementById("studentSelect");
+                            const foundStudent = studentList.find(s => 
+                                s.studentName.toLowerCase() === studentName.toLowerCase() || 
+                                (studentId && s.studentId && s.studentId.toLowerCase() === studentId.toLowerCase())
+                            );
+                            
+                            if (foundStudent) {
+                                select.value = foundStudent.studentName;
+                                select.dispatchEvent(new Event('change'));
+                                matched = true;
+                            } else {
+                                // Save values in hidden inputs first
+                                document.getElementById("studentName").value = studentName;
+                                document.getElementById("studentId").value = studentId || "";
+                                
+                                if (confirm(`Phát hiện học viên mới: "${studentName}" (${studentId || 'Chưa rõ Mã'}). Bạn có muốn tạo hồ sơ học viên mới này không?`)) {
+                                    showCreateStudentModal(studentName, studentId || "");
+                                    matched = true;
+                                }
+                            }
                         }
-                        if (studentId) {
-                            document.getElementById("studentId").value = studentId;
+                        
+                        if (!matched) {
+                            if (studentName) document.getElementById("studentName").value = studentName;
+                            if (studentId) document.getElementById("studentId").value = studentId;
                         }
+
                         if (day && day >= 1 && day <= 28) {
                             document.getElementById("daySelect").value = day;
                             updateDayPromptPreview();
@@ -2257,9 +2668,16 @@
             document.getElementById("submitGradingBtn").disabled = true;
 
             const dayData = appConfig.daysData[day] || { title: "", question: "" };
+            
+            // Get student notes
+            const selectedStudentName = document.getElementById("studentSelect").value;
+            const currentStudentObj = studentList.find(s => s.studentName === selectedStudentName);
+            const notes = currentStudentObj ? currentStudentObj.notes : "";
+            
             const payload = {
                 action: "grade_and_save",
                 apiKey: appConfig.apiKey,
+                username: currentUser ? currentUser.username : "admin",
                 studentId: studentId,
                 studentName: studentName,
                 day: day,
@@ -2268,7 +2686,8 @@
                 essay: essay,
                 systemPrompt: compiledSystemPrompt,
                 teacherPronoun: teacherPronoun,
-                studentPronoun: studentPronoun
+                studentPronoun: studentPronoun,
+                notes: notes
             };
 
             const gradingId = "grade_" + Date.now();
@@ -2508,9 +2927,16 @@
             const teacherPronoun = document.getElementById("teacherPronoun").value.trim() || "chị";
             const studentPronoun = document.getElementById("studentPronoun").value.trim() || "em";
             const dayData = appConfig.daysData[currentGradingResult.day] || { title: "", question: "" };
+            
+            // Get student notes
+            const selectedStudentName = currentGradingResult.studentName;
+            const currentStudentObj = studentList.find(s => s.studentName === selectedStudentName);
+            const notes = currentStudentObj ? currentStudentObj.notes : "";
+
             const payload = {
                 action: "rewrite_review",
                 apiKey: appConfig.apiKey,
+                username: currentUser ? currentUser.username : "admin",
                 studentId: currentGradingResult.studentId,
                 studentName: currentGradingResult.studentName,
                 day: currentGradingResult.day,
@@ -2521,7 +2947,8 @@
                 feedback: feedbackText,
                 systemPrompt: compiledSystemPrompt,
                 teacherPronoun: teacherPronoun,
-                studentPronoun: studentPronoun
+                studentPronoun: studentPronoun,
+                notes: notes
             };
             
             try {
@@ -2811,6 +3238,66 @@
             // Settings tab switching
             initSettingsTabs();
 
+            // Student Selector Change
+            document.getElementById("studentSelect").addEventListener("change", (e) => {
+                const val = e.target.value;
+                if (val) {
+                    const student = studentList.find(s => s.studentName === val);
+                    if (student) {
+                        document.getElementById("studentId").value = student.studentId;
+                        document.getElementById("studentName").value = student.studentName;
+                        document.getElementById("teacherPronoun").value = student.teacherPronoun || "chị";
+                        document.getElementById("studentPronoun").value = student.studentPronoun || "em";
+                        
+                        // Show info
+                        document.getElementById("infoStudentId").textContent = student.studentId || "(Không có)";
+                        document.getElementById("infoStudentNotes").textContent = student.notes || "(Không có)";
+                        document.getElementById("selectedStudentInfoRow").style.display = "grid";
+                        document.getElementById("selectedStudentInfoRow").style.gridTemplateColumns = "1fr 2fr";
+                        document.getElementById("selectedStudentInfoRow").style.gap = "0.75rem";
+                        
+                        // Highlight matching preset pill
+                        if (typeof updateActivePresetPill === 'function') updateActivePresetPill();
+                    }
+                } else {
+                    document.getElementById("studentId").value = "";
+                    document.getElementById("studentName").value = "";
+                    document.getElementById("selectedStudentInfoRow").style.display = "none";
+                }
+            });
+
+            // Student Modals
+            document.getElementById("createNewStudentBtn").addEventListener("click", () => showCreateStudentModal());
+            document.getElementById("closeStudentModalBtn").addEventListener("click", () => {
+                document.getElementById("studentModal").style.display = "none";
+            });
+            const sModal = document.getElementById("studentModal");
+            sModal.addEventListener("click", (e) => {
+                if (e.target === sModal) sModal.style.display = "none";
+            });
+
+            // Authentication Toggle
+            document.getElementById("toggleAuthModeLink").addEventListener("click", (e) => {
+                e.preventDefault();
+                const loginForm = document.getElementById("loginForm");
+                const registerForm = document.getElementById("registerForm");
+                const title = document.getElementById("loginTitle");
+                const link = document.getElementById("toggleAuthModeLink");
+                
+                if (loginForm.style.display === "none") {
+                    loginForm.style.display = "block";
+                    registerForm.style.display = "none";
+                    title.innerHTML = `<i data-lucide="lock" style="color: var(--primary);"></i> Đăng nhập hệ thống`;
+                    link.textContent = "Chưa có tài khoản? Đăng ký tại đây";
+                } else {
+                    loginForm.style.display = "none";
+                    registerForm.style.display = "block";
+                    title.innerHTML = `<i data-lucide="user-plus" style="color: var(--primary);"></i> Đăng ký giảng viên`;
+                    link.textContent = "Đã có tài khoản? Đăng nhập tại đây";
+                }
+                lucide.createIcons();
+            });
+
             // Form Submit
             document.getElementById("gradingForm").addEventListener("submit", runGrading);
 
@@ -3017,5 +3504,98 @@
             return cleaned;
         }
     </script>
+
+    <!-- Login Overlay -->
+    <div id="loginOverlay" class="login-overlay">
+        <div class="login-card glass-panel">
+            <h2 id="loginTitle" style="font-family: var(--font-heading); margin-bottom: 1.5rem; text-align: center; color: var(--text-main); display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                <i data-lucide="lock" style="color: var(--primary);"></i> Đăng nhập hệ thống
+            </h2>
+            
+            <!-- Login Form -->
+            <form id="loginForm" onsubmit="event.preventDefault(); handleLogin();">
+                <div class="form-group">
+                    <label for="loginUsername">Tên đăng nhập</label>
+                    <input type="text" id="loginUsername" placeholder="Nhập tên đăng nhập..." required autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">Mật khẩu</label>
+                    <input type="password" id="loginPassword" placeholder="Nhập mật khẩu..." required autocomplete="current-password">
+                </div>
+                <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.75rem;">
+                    <input type="checkbox" id="rememberMe" style="width: auto;" checked>
+                    <label for="rememberMe" style="margin-bottom: 0; font-weight: normal; font-size: 0.85rem; cursor: pointer; user-select: none;">Nhớ mật khẩu trên máy này</label>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem;" id="loginSubmitBtn">
+                    <i data-lucide="log-in"></i> Đăng nhập
+                </button>
+            </form>
+
+            <!-- Register Form (Hidden by default) -->
+            <form id="registerForm" onsubmit="event.preventDefault(); handleRegister();" style="display: none;">
+                <div class="form-group">
+                    <label for="regUsername">Tên đăng nhập mới</label>
+                    <input type="text" id="regUsername" placeholder="Ví dụ: gv_hanh" required autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label for="regFullname">Họ và tên giảng viên</label>
+                    <input type="text" id="regFullname" placeholder="Ví dụ: Nguyễn Thị Hạnh" required>
+                </div>
+                <div class="form-group">
+                    <label for="regPassword">Mật khẩu</label>
+                    <input type="password" id="regPassword" placeholder="Nhập mật khẩu..." required autocomplete="new-password">
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem;" id="registerSubmitBtn">
+                    <i data-lucide="user-plus"></i> Đăng ký tài khoản
+                </button>
+            </form>
+            
+            <div style="margin-top: 1.25rem; text-align: center; font-size: 0.85rem;">
+                <a href="#" id="toggleAuthModeLink" style="color: var(--primary); text-decoration: none; font-weight: 600;">Chưa có tài khoản? Đăng ký tại đây</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Student Modal -->
+    <div id="studentModal" class="login-overlay" style="display: none;">
+        <div class="login-card glass-panel" style="max-width: 480px; position: relative;">
+            <button type="button" class="btn btn-secondary btn-icon" id="closeStudentModalBtn" style="position: absolute; top: 0.75rem; right: 0.75rem; padding: 0.25rem; border: none; background: transparent; height: auto;" title="Đóng">
+                <i data-lucide="x"></i>
+            </button>
+            <h3 style="font-family: var(--font-heading); margin-bottom: 1.25rem; color: var(--text-main); display: flex; align-items: center; gap: 0.5rem;">
+                <i data-lucide="user-plus" style="color: var(--primary);"></i> Tạo hồ sơ học viên mới
+            </h3>
+            <form id="createStudentForm" onsubmit="event.preventDefault(); saveNewStudent();">
+                <div class="form-group">
+                    <label for="newStudentName">Tên học viên <span style="color: var(--danger)">*</span></label>
+                    <input type="text" id="newStudentName" placeholder="Ví dụ: Nguyễn Thị Bình" required>
+                </div>
+                <div class="form-group">
+                    <label for="newStudentId">Mã học viên (Optional)</label>
+                    <input type="text" id="newStudentId" placeholder="Ví dụ: HV999">
+                </div>
+                
+                <div class="form-row" style="grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="newTeacherPron">AI xưng là</label>
+                        <input type="text" id="newTeacherPron" value="chị" placeholder="chị, tôi, thầy...">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="newStudentPron">Gọi học viên là</label>
+                        <input type="text" id="newStudentPron" value="em" placeholder="em, anh, bạn, bác...">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="newStudentNotes">Thông tin thêm / Ghi chú đặc điểm học viên</label>
+                    <textarea id="newStudentNotes" style="height: 80px; min-height: 80px;" placeholder="Ví dụ: 60 tuổi, bác sĩ về hưu, cần nhận xét nhẹ nhàng nâng đỡ..."></textarea>
+                </div>
+                
+                <button type="submit" class="btn btn-primary" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                    <i data-lucide="save"></i> Lưu hồ sơ học viên
+                </button>
+            </form>
+        </div>
+    </div>
 </body>
 </html>
