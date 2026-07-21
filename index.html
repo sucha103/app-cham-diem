@@ -1065,6 +1065,13 @@
                 <p>Trợ lý ảo chấm bài tự động và phân tích tư duy học viên</p>
             </div>
             <div class="header-actions">
+                <div id="userInfoBadge" style="display: none; align-items: center; gap: 0.5rem; background: rgba(255, 255, 255, 0.05); padding: 0.35rem 0.75rem; border-radius: 20px; border: 1px solid var(--border-glass); font-size: 0.85rem;">
+                    <i data-lucide="user" style="width: 14px; height: 14px; color: var(--primary);"></i>
+                    <span id="userFullnameText" style="font-weight: 500;">-</span>
+                </div>
+                <button class="btn btn-secondary btn-icon" id="logoutBtn" style="display: none;" title="Đăng xuất tài khoản">
+                    <i data-lucide="log-out" style="color: var(--danger);"></i>
+                </button>
                 <button class="btn btn-secondary btn-icon" id="themeToggleBtn" title="Chuyển chế độ Sáng/Tối">
                     <i data-lucide="sun"></i>
                 </button>
@@ -1641,6 +1648,7 @@
                         studentList = resJson.students || [];
                         renderStudentSelect();
                         
+                        updateUIForLoggedInUser();
                         // Hide login overlay
                         document.getElementById("loginOverlay").style.display = "none";
                         showToast(`Chào mừng ${resJson.fullname} quay trở lại!`, "success");
@@ -1735,6 +1743,7 @@
                     studentList = resJson.students || [];
                     renderStudentSelect();
                     
+                    updateUIForLoggedInUser();
                     // Hide login overlay
                     document.getElementById("loginOverlay").style.display = "none";
                     showToast(`Đăng nhập thành công! Xin chào ${resJson.fullname}.`, "success");
@@ -1914,6 +1923,34 @@
                 });
             } catch (e) {
                 console.error("Lỗi đồng bộ cấu hình lên Cloud:", e);
+            }
+        }
+
+        function updateUIForLoggedInUser() {
+            const badge = document.getElementById("userInfoBadge");
+            const fullnameText = document.getElementById("userFullnameText");
+            const logoutBtn = document.getElementById("logoutBtn");
+            
+            if (currentUser) {
+                fullnameText.textContent = currentUser.fullname || currentUser.username;
+                badge.style.display = "flex";
+                logoutBtn.style.display = "inline-flex";
+            } else {
+                badge.style.display = "none";
+                logoutBtn.style.display = "none";
+            }
+            lucide.createIcons();
+        }
+
+        function handleLogout() {
+            if (confirm("Bạn có chắc chắn muốn đăng xuất tài khoản?")) {
+                currentUser = null;
+                localStorage.removeItem("mini_grading_user");
+                updateUIForLoggedInUser();
+                document.getElementById("loginUsername").value = "";
+                document.getElementById("loginPassword").value = "";
+                document.getElementById("loginOverlay").style.display = "flex";
+                showToast("Đã đăng xuất thành công!", "info");
             }
         }
 
@@ -3222,8 +3259,9 @@
 
         // UI Event Handlers
         function registerEventListeners() {
-            // Theme toggle
+            // Theme toggle & Logout
             document.getElementById("themeToggleBtn").addEventListener("click", toggleTheme);
+            document.getElementById("logoutBtn").addEventListener("click", handleLogout);
             
             // Settings modal open/close
             document.getElementById("settingsBtn").addEventListener("click", openModal);
