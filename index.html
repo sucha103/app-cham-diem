@@ -1114,9 +1114,22 @@
                     </div>
 
                     <!-- Selected Student Details (Hidden/Collapsed read-only details) -->
-                    <div class="form-row" id="selectedStudentInfoRow" style="display: none; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-glass); border-radius: 8px; padding: 0.6rem 0.75rem; margin-bottom: 1.25rem; font-size: 0.85rem;">
+                    <div class="form-row" id="selectedStudentInfoRow" style="display: none; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-glass); border-radius: 8px; padding: 0.6rem 0.75rem; margin-bottom: 0.75rem; font-size: 0.85rem;">
                         <div><strong>Mã HV:</strong> <span id="infoStudentId">-</span></div>
                         <div><strong>Ghi chú:</strong> <span id="infoStudentNotes">-</span></div>
+                    </div>
+
+                    <!-- Student Memory Timeline Container (V5) -->
+                    <div id="studentMemoryContainer" style="display: none; background: rgba(255, 255, 255, 0.03); border: 1px dashed var(--primary); border-radius: 10px; padding: 0.75rem 0.85rem; margin-bottom: 1.25rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <span style="font-size: 0.8rem; font-weight: 600; color: var(--primary); display: flex; align-items: center; gap: 0.35rem;">
+                                <i data-lucide="brain" style="width: 14px; height: 14px;"></i> Ký ức & Tiến độ Phản tư (<span id="memoryCountText">0</span> bài cũ)
+                            </span>
+                            <span style="font-size: 0.7rem; color: var(--text-muted);">Click ngày để xem bài cũ</span>
+                        </div>
+                        <div id="studentMemoryBadges" style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
+                            <!-- Dynamically populated memory pills -->
+                        </div>
                     </div>
 
                     <!-- Hidden inputs to remain backward compatible with code that reads from #studentId and #studentName -->
@@ -1526,14 +1539,16 @@
         // Default System Prompt
         const DEFAULT_SYSTEM_PROMPT = 
             "Bạn là giảng viên chuyên nghiệp, đóng vai trò là người đồng hành chấm bài viết cho khóa học '28 Ngày Rèn Tư Duy Qua Viết'.\n" +
-            "Nhiệm vụ của bạn là nhận xét bài viết phản tư của học viên dựa trên câu hỏi định hướng của ngày học.\n" +
-            "LƯU Ý VỀ LỊCH SỬ HỌC TẬP (QUAN TRỌNG): Hãy đọc kỹ phần lịch sử viết bài và lời phê của các ngày trước (nếu có) được cung cấp ở đầu ngữ cảnh. Trong phần nhận xét (đặc biệt là phần Tổng quan hoặc Lời khuyên), hãy chủ động liên hệ, đối chiếu với quá trình phát triển của học viên từ những ngày trước để đưa ra nhận xét mang tính liền mạch, ghi nhận sự tiến bộ hoặc nhắc nhở học viên kết nối các bài học cũ với nhau.\n\n" +
+            "Nhiệm vụ của bạn là nhận xét bài viết phản tư của học viên dựa trên câu hỏi định hướng của ngày học.\n\n" +
+            "LƯU Ý VỀ LỊCH SỬ HỌC TẬP (BẮT BUỘC TRÍCH DẪN): Hãy đọc kỹ phần lịch sử viết bài và lời phê của các ngày trước (nếu có) ở đầu ngữ cảnh. Nếu có bài cũ, trong phần **Tổng quan**, bạn BẮT BUỘC phải bổ sung thêm 1 dòng theo đúng cú pháp:\n" +
+            "🔗 **[Kết nối ký ức]**: [Viết 1-2 câu ngắn gọn đối chiếu bài hôm nay với sự tiến bộ hoặc chi tiết cụ thể từ Ngày X trước đó]\n\n" +
             "YÊU CẦU QUAN TRỌNG VỀ ĐỊNH DẠNG VÀ PHONG CÁCH:\n" +
             "1. ĐỘ DÀI: Nhận xét ngắn gọn, cô đọng, tối đa 200 từ.\n" +
             "2. NGÔN NGỮ: Sử dụng tiếng Việt chuẩn xác.\n" +
             "3. XƯNG HÔ (BẮT BUỘC): Luôn xưng hô 'chị' và gọi học viên là 'em'. Giữ giọng văn thấu hiểu, nhẹ nhàng, mang tính định hướng nâng đỡ và khích lệ tinh thần.\n" +
             "4. CẤU TRÚC PHẢN HỒI (BẮT BUỘC): Trả về nhận xét theo đúng cấu trúc sau:\n" +
-            "**Tổng quan**: [Đánh giá chung về bài viết và sự liên kết với câu hỏi định hướng của ngày học]\n" +
+            "**Tổng quan**: [Đánh giá chung về bài viết]\n" +
+            "🔗 **[Kết nối ký ức]**: [Trích dẫn và đối chiếu với bài học/ngày cũ - nếu có lịch sử]\n" +
             "**Phân tích**:\n" +
             "- *Điểm tốt*: [Liệt kê các điểm sáng dựa trên các kỹ năng được kích hoạt]\n" +
             "- *Điểm cần cải thiện*: [Liệt kê các điểm cần đào sâu hoặc sửa đổi dựa trên các kỹ năng được kích hoạt]\n" +
@@ -1901,6 +1916,89 @@
                 console.error("Lỗi lưu học viên:", e);
                 showToast("Lỗi kết nối mạng khi lưu học viên.", "error");
             }
+        }
+
+        let currentStudentHistory = [];
+
+        async function fetchAndRenderStudentMemory(studentName) {
+            const container = document.getElementById("studentMemoryContainer");
+            const badgesContainer = document.getElementById("studentMemoryBadges");
+            const countText = document.getElementById("memoryCountText");
+            
+            if (!studentName || !appConfig.appsScriptUrl) {
+                container.style.display = "none";
+                currentStudentHistory = [];
+                return;
+            }
+            
+            badgesContainer.innerHTML = '<span style="font-size:0.75rem; color:var(--text-muted);">Đang tải ký ức...</span>';
+            container.style.display = "block";
+            
+            try {
+                const response = await fetch(appConfig.appsScriptUrl, {
+                    method: "POST",
+                    mode: "cors",
+                    headers: {
+                        "Content-Type": "text/plain"
+                    },
+                    body: JSON.stringify({
+                        action: "get_student_history",
+                        studentName: studentName
+                    })
+                });
+                
+                const resText = await response.text();
+                const resJson = JSON.parse(resText);
+                
+                if (resJson.success && resJson.history) {
+                    currentStudentHistory = resJson.history;
+                    countText.textContent = currentStudentHistory.length;
+                    
+                    if (currentStudentHistory.length === 0) {
+                        badgesContainer.innerHTML = '<span style="font-size:0.75rem; color:var(--text-muted); font-style:italic;">Chưa có bài phản tư nào được lưu trên Cloud.</span>';
+                        return;
+                    }
+                    
+                    badgesContainer.innerHTML = "";
+                    currentStudentHistory.forEach((item, index) => {
+                        const badge = document.createElement("button");
+                        badge.type = "button";
+                        badge.className = "btn btn-secondary";
+                        badge.style.padding = "0.2rem 0.5rem";
+                        badge.style.fontSize = "0.75rem";
+                        badge.style.borderRadius = "6px";
+                        badge.style.display = "inline-flex";
+                        badge.style.alignItems = "center";
+                        badge.style.gap = "0.25rem";
+                        badge.style.height = "auto";
+                        badge.title = `Click xem lại bài Ngày ${item.day}`;
+                        badge.innerHTML = `<i data-lucide="check-circle" style="width:12px; height:12px; color:var(--success);"></i> Ngày ${item.day}`;
+                        badge.addEventListener("click", () => viewStudentMemoryDetail(index));
+                        badgesContainer.appendChild(badge);
+                    });
+                    lucide.createIcons();
+                } else {
+                    badgesContainer.innerHTML = '<span style="font-size:0.75rem; color:var(--text-muted);">Không thể tải ký ức.</span>';
+                }
+            } catch (e) {
+                console.error("Lỗi lấy lịch sử ký ức:", e);
+                badgesContainer.innerHTML = '<span style="font-size:0.75rem; color:var(--danger);">Lỗi tải ký ức.</span>';
+            }
+        }
+
+        function viewStudentMemoryDetail(index) {
+            const item = currentStudentHistory[index];
+            if (!item) return;
+            
+            document.getElementById("memoryModalTitle").innerHTML = `<i data-lucide="book-open" style="color: var(--primary);"></i> Lịch sử phản tư Ngày ${item.day}: ${escapeHtml(item.dayTitle || '')}`;
+            document.getElementById("memoryModalEssay").textContent = item.essay || "(Không có nội dung)";
+            
+            const reviewContainer = document.getElementById("memoryModalReview");
+            const cleanedReview = cleanMarkdownResponse(item.aiReview || '');
+            reviewContainer.innerHTML = typeof marked !== 'undefined' ? marked.parse(cleanedReview) : escapeHtml(cleanedReview);
+            
+            document.getElementById("memoryDetailModal").style.display = "flex";
+            lucide.createIcons();
         }
 
         async function syncUserConfigToCloud() {
@@ -2792,6 +2890,9 @@
                 }
 
                 displayGradingResult(currentGradingResult);
+                
+                // Refresh memory timeline for student
+                fetchAndRenderStudentMemory(studentName);
 
             } catch (err) {
                 console.error("Grading error:", err);
@@ -3295,6 +3396,9 @@
                         document.getElementById("selectedStudentInfoRow").style.gridTemplateColumns = "1fr 2fr";
                         document.getElementById("selectedStudentInfoRow").style.gap = "0.75rem";
                         
+                        // Fetch memory timeline
+                        fetchAndRenderStudentMemory(student.studentName);
+                        
                         // Highlight matching preset pill
                         if (typeof updateActivePresetPill === 'function') updateActivePresetPill();
                     }
@@ -3302,6 +3406,7 @@
                     document.getElementById("studentId").value = "";
                     document.getElementById("studentName").value = "";
                     document.getElementById("selectedStudentInfoRow").style.display = "none";
+                    document.getElementById("studentMemoryContainer").style.display = "none";
                 }
             });
 
@@ -3313,6 +3418,15 @@
             const sModal = document.getElementById("studentModal");
             sModal.addEventListener("click", (e) => {
                 if (e.target === sModal) sModal.style.display = "none";
+            });
+
+            // Memory Detail Modal
+            document.getElementById("closeMemoryModalBtn").addEventListener("click", () => {
+                document.getElementById("memoryDetailModal").style.display = "none";
+            });
+            const mModal = document.getElementById("memoryDetailModal");
+            mModal.addEventListener("click", (e) => {
+                if (e.target === mModal) mModal.style.display = "none";
             });
 
             // Authentication Toggle
@@ -3634,6 +3748,25 @@
                     <i data-lucide="save"></i> Lưu hồ sơ học viên
                 </button>
             </form>
+        </div>
+    </div>
+    <!-- Memory Detail View Modal (V5) -->
+    <div id="memoryDetailModal" class="login-overlay" style="display: none;">
+        <div class="login-card glass-panel" style="max-width: 600px; max-height: 85vh; overflow-y: auto; position: relative;">
+            <button type="button" class="btn btn-secondary btn-icon" id="closeMemoryModalBtn" style="position: absolute; top: 0.75rem; right: 0.75rem; padding: 0.25rem; border: none; background: transparent; height: auto;" title="Đóng">
+                <i data-lucide="x"></i>
+            </button>
+            <h3 style="font-family: var(--font-heading); margin-bottom: 1rem; color: var(--text-main); display: flex; align-items: center; gap: 0.5rem;" id="memoryModalTitle">
+                <i data-lucide="book-open" style="color: var(--primary);"></i> Lịch sử phản tư Ngày X
+            </h3>
+            <div style="margin-bottom: 1rem;">
+                <h5 style="font-size: 0.85rem; color: var(--primary); margin-bottom: 0.35rem;">Bài làm phản tư của học viên:</h5>
+                <div id="memoryModalEssay" style="background: rgba(0, 0, 0, 0.2); border: 1px solid var(--border-glass); border-radius: 8px; padding: 0.75rem; font-size: 0.85rem; max-height: 180px; overflow-y: auto; white-space: pre-wrap;"></div>
+            </div>
+            <div>
+                <h5 style="font-size: 0.85rem; color: var(--primary); margin-bottom: 0.35rem;">Nhận xét & Lời phê của Giảng viên:</h5>
+                <div id="memoryModalReview" style="background: rgba(0, 0, 0, 0.2); border: 1px solid var(--border-glass); border-radius: 8px; padding: 0.75rem; font-size: 0.85rem; max-height: 220px; overflow-y: auto;"></div>
+            </div>
         </div>
     </div>
 </body>

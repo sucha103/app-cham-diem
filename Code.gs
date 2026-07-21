@@ -231,6 +231,38 @@ function doPost(e) {
       return createJsonResponse({ success: true, msg: "Lưu hồ sơ học viên thành công!", students: students });
     }
 
+    // 5.5. LẤY CHI TIẾT LỊCH SỬ KÝ ỨC CỦA HỌC VIÊN
+    if (action === "get_student_history") {
+      const sName = payload.studentName || "";
+      if (!sName) {
+        throw new Error("Thiếu Tên học viên để lấy lịch sử.");
+      }
+      const ss = SpreadsheetApp.getActiveSpreadsheet();
+      const sheet = ss.getSheetByName(TAB_NAME);
+      if (!sheet) {
+        return createJsonResponse({ success: true, history: [] });
+      }
+      
+      const data = sheet.getDataRange().getValues();
+      const historyList = [];
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][3] == sName) {
+          historyList.push({
+            timestamp: data[i][0],
+            teacherUsername: data[i][1],
+            studentId: data[i][2],
+            studentName: data[i][3],
+            day: data[i][4],
+            dayTitle: data[i][5],
+            essay: data[i][6],
+            aiReview: data[i][7]
+          });
+        }
+      }
+      historyList.sort((a, b) => parseInt(a.day) - parseInt(b.day));
+      return createJsonResponse({ success: true, history: historyList });
+    }
+
     // Lấy thông tin đầu vào phục vụ chấm bài/sửa bài
     const apiKey = payload.apiKey;
     const studentId = payload.studentId || "";
@@ -442,14 +474,16 @@ function callGemmaAPI(apiKey, day, dayTitle, promptQuestion, essay, clientSystem
   // Xây dựng system instruction mặc định
   const defaultSystemInstruction = 
     "Bạn là giảng viên chuyên nghiệp, đóng vai trò là người đồng hành chấm bài viết cho khóa học '28 Ngày Rèn Tư Duy Qua Viết'.\n" +
-    "Nhiệm vụ của bạn là nhận xét bài viết phản tư của học viên dựa trên câu hỏi định hướng của ngày học.\n" +
-    "LƯU Ý VỀ LỊCH SỬ HỌC TẬP (QUAN TRỌNG): Hãy đọc kỹ phần lịch sử viết bài và lời phê của các ngày trước (nếu có) được cung cấp ở đầu ngữ cảnh. Trong phần nhận xét (đặc biệt là phần Tổng quan hoặc Lời khuyên), hãy chủ động liên hệ, đối chiếu với quá trình phát triển của học viên từ những ngày trước để đưa ra nhận xét mang tính liền mạch, ghi nhận sự tiến bộ hoặc nhắc nhở học viên kết nối các bài học cũ với nhau.\n\n" +
+    "Nhiệm vụ của bạn là nhận xét bài viết phản tư của học viên dựa trên câu hỏi định hướng của ngày học.\n\n" +
+    "LƯU Ý VỀ LỊCH SỬ HỌC TẬP (BẮT BUỘC TRÍCH DẪN): Hãy đọc kỹ phần lịch sử viết bài và lời phê của các ngày trước (nếu có) ở đầu ngữ cảnh. Nếu có bài cũ, trong phần **Tổng quan**, bạn BẮT BUỘC phải bổ sung thêm 1 dòng theo đúng cú pháp:\n" +
+    "🔗 **[Kết nối ký ức]**: [Viết 1-2 câu ngắn gọn đối chiếu bài hôm nay với sự tiến bộ hoặc chi tiết cụ thể từ Ngày X trước đó]\n\n" +
     "YÊU CẦU QUAN TRỌNG VỀ ĐỊNH DẠNG VÀ PHONG CÁCH:\n" +
     "1. ĐỘ DÀI: Nhận xét ngắn gọn, cô đọng, tối đa 200 từ.\n" +
     "2. NGÔN NGỮ: Sử dụng tiếng Việt chuẩn xác.\n" +
     "3. XƯNG HÔ (BẮT BUỘC): Luôn xưng hô '" + tPronoun + "' và gọi học viên là '" + sPronoun + "'. Giữ giọng văn thấu hiểu, nhẹ nhàng, mang tính định hướng nâng đỡ và khích lệ tinh thần.\n" +
     "4. CẤU TRÚC PHẢN HỒI (BẮT BUỘC): Trả về nhận xét theo đúng cấu trúc sau:\n" +
-    "**Tổng quan**: [Đánh giá chung về bài viết và sự liên kết với câu hỏi định hướng của ngày học]\n" +
+    "**Tổng quan**: [Đánh giá chung về bài viết]\n" +
+    "🔗 **[Kết nối ký ức]**: [Trích dẫn và đối chiếu với bài học/ngày cũ - nếu có lịch sử]\n" +
     "**Phân tích**:\n" +
     "- *Điểm tốt*: [Liệt kê các điểm sáng dựa trên các kỹ năng được kích hoạt]\n" +
     "- *Điểm cần cải thiện*: [Liệt kê các điểm cần đào sâu hoặc sửa đổi dựa trên các kỹ năng được kích hoạt]\n" +
